@@ -43,6 +43,7 @@ static PIN_State ledState;
 
 
 //test comment tttttt uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx uutta texstii 22222
+// uutta testiiiiiiii
 
 PIN_Config buttonConfig[] = {
    Board_BUTTON0  | PIN_INPUT_EN | PIN_PULLUP | PIN_IRQ_NEGEDGE,
