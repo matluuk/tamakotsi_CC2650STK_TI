@@ -92,19 +92,36 @@ Void sensorTaskFxn(UArg arg0, UArg arg1) {
 
     I2C_Handle      i2c;
     I2C_Params      i2cParams;
+    double valoisuus;
+    char merkkijono[32];
 
     // JTKJ: Tehtävä 2. Avaa i2c-väylä taskin käyttöön
     // JTKJ: Exercise 2. Open the i2c bus
+    I2C_Params_init(&i2cParams);
+    i2cParams.bitRate = I2C_400kHz;
+
+    // Avataan yhteys
+    i2c = I2C_open(Board_I2C_TMP, &i2cParams);
+    if (i2c == NULL) {
+      System_abort("Error Initializing I2C\n");
+    }
 
     // JTKJ: Tehtävä 2. Alusta sensorin OPT3001 setup-funktiolla
     //       Laita enne funktiokutsua eteen 100ms viive (Task_sleep)
     // JTKJ: Exercise 2. Setup the OPT3001 sensor for use
     //       Before calling the setup function, insertt 100ms delay with Task_sleep
+    Task_sleep(1000 / Clock_tickPeriod);
+    opt3001_setup(&i2c);
 
     while (1) {
 
         // JTKJ: Tehtävä 2. Lue sensorilta dataa ja tulosta se Debug-ikkunaan merkkijonona
         // JTKJ: Exercise 2. Read sensor data and print it to the Debug window as string
+        valoisuus = opt3001_get_data(&i2c);
+
+        sprintf(merkkijono,"valoisuus: %.2f luxia\n",valoisuus);
+        System_printf(merkkijono);
+
 
         // JTKJ: Tehtävä 3. Tallenna mittausarvo globaaliin muuttujaan
         //       Muista tilamuutos
@@ -134,6 +151,7 @@ Int main(void) {
     
     // JTKJ: Tehtävä 2. Ota i2c-väylä käyttöön ohjelmassa
     // JTKJ: Exercise 2. Initialize i2c bus
+    Board_initI2C();
     // JTKJ: Tehtävä 4. Ota UART käyttöön ohjelmassa
     // JTKJ: Exercise 4. Initialize UART
 
