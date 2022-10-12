@@ -91,7 +91,7 @@ double opt3001_get_data(I2C_Handle *i2c) {
 		if (I2C_transfer(*i2c, &i2cMessage)) {
 
 	        // JTKJ: Here the conversion from register value to lux
-		    uint16_t exp = rxBuffer[1] >> 4;
+		    uint16_t exp = rxBuffer[0] >> 4;
             uint16_t maski = 0b0000111111111111;
             uint16_t result = (((uint16_t)rxBuffer[0] << 8) | ((uint16_t)rxBuffer[1] & 0xff)) & maski;
 
