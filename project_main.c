@@ -67,8 +67,31 @@ void buttonFxn(PIN_Handle handle, PIN_Id pinId) {
 /* Task Functions */
 Void uartTaskFxn(UArg arg0, UArg arg1) {
 
+    char merkkijono[32];
+
     // JTKJ: Tehtävä 4. Lisää UARTin alustus: 9600,8n1
     // JTKJ: Exercise 4. Setup here UART connection as 9600,8n1
+
+    // UART-kirjaston asetukset
+    UART_Handle uart;
+    UART_Params uartParams;
+
+    // Alustetaan sarjaliikenne
+    UART_Params_init(&uartParams);
+    uartParams.writeDataMode = UART_DATA_TEXT;
+    uartParams.readDataMode = UART_DATA_TEXT;
+    uartParams.readEcho = UART_ECHO_OFF;
+    uartParams.readMode=UART_MODE_BLOCKING;
+    uartParams.baudRate = 9600; // nopeus 9600baud
+    uartParams.dataLength = UART_LEN_8; // 8
+    uartParams.parityType = UART_PAR_NONE; // n
+    uartParams.stopBits = UART_STOP_ONE; // 1
+
+    // Avataan yhteys laitteen sarjaporttiin vakiossa Board_UART0
+    uart = UART_open(Board_UART0, &uartParams);
+    if (uart == NULL) {
+        System_abort("Error opening the UART");
+}
 
     while (1) {
 
@@ -80,22 +103,20 @@ Void uartTaskFxn(UArg arg0, UArg arg1) {
         if(programState == DATA_READY){
             programState = WAITING;
 
-            char merkkijono[32];
-            sprintf(merkkijono,"valoisuus: %.2f luxia\n",ambientLight);
+            sprintf(merkkijono,"valoisuus: %.2f luxia\n\r",ambientLight);
             System_printf(merkkijono);
             System_flush();
+
+            // JTKJ: Tehtävä 4. Lähetä sama merkkijono UARTilla
+            // JTKJ: Exercise 4. Send the same sensor data string with UART
+            UART_write(uart, merkkijono, strlen(merkkijono));
         }
 
-
-        // JTKJ: Tehtävä 4. Lähetä sama merkkijono UARTilla
-        // JTKJ: Exercise 4. Send the same sensor data string with UART
-
         // Just for sanity check for exercise, you can comment this out
-        System_printf("uartTask\n");
-        System_flush();
+        //System_printf("uartTask\n");
+        //System_flush();
 
-        // Once per second, you can modify this
-        Task_sleep(1000000 / Clock_tickPeriod);
+        Task_sleep(1000 / Clock_tickPeriod);
     }
 }
 
@@ -136,7 +157,6 @@ Void sensorTaskFxn(UArg arg0, UArg arg1) {
         System_flush();
         */
 
-
         // JTKJ: Tehtävä 3. Tallenna mittausarvo globaaliin muuttujaan
         //       Muista tilamuutos
         // JTKJ: Exercise 3. Save the sensor value into the global variable
@@ -148,10 +168,9 @@ Void sensorTaskFxn(UArg arg0, UArg arg1) {
             ambientLight = valoisuus;
         }
 
-
         // Just for sanity check for exercise, you can comment this out
-        System_printf("sensorTask\n");
-        System_flush();
+        //System_printf("sensorTask\n");
+        //System_flush();
 
         // Once per second, you can modify this
         Task_sleep(1000000 / Clock_tickPeriod);
@@ -175,6 +194,7 @@ Int main(void) {
     Board_initI2C();
     // JTKJ: Tehtävä 4. Ota UART käyttöön ohjelmassa
     // JTKJ: Exercise 4. Initialize UART
+    Board_initUART();
 
     // JTKJ: Tehtävä 1. Ota painonappi ja ledi ohjelman käyttöön
     //       Muista rekisteröidä keskeytyksen käsittelijä painonapille
