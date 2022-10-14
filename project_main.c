@@ -77,6 +77,16 @@ Void uartTaskFxn(UArg arg0, UArg arg1) {
         // JTKJ: Exercise 3. Print out sensor data as string to debug window if the state is correct
         //       Remember to modify state
 
+        if(programState == DATA_READY){
+            programState = WAITING;
+
+            char merkkijono[32];
+            sprintf(merkkijono,"valoisuus: %.2f luxia\n",ambientLight);
+            System_printf(merkkijono);
+            System_flush();
+        }
+
+
         // JTKJ: Tehtävä 4. Lähetä sama merkkijono UARTilla
         // JTKJ: Exercise 4. Send the same sensor data string with UART
 
@@ -120,14 +130,24 @@ Void sensorTaskFxn(UArg arg0, UArg arg1) {
         // JTKJ: Exercise 2. Read sensor data and print it to the Debug window as string
         valoisuus = opt3001_get_data(&i2c);
 
+        /*
         sprintf(merkkijono,"valoisuus: %.2f luxia\n",valoisuus);
         System_printf(merkkijono);
+        System_flush();
+        */
 
 
         // JTKJ: Tehtävä 3. Tallenna mittausarvo globaaliin muuttujaan
         //       Muista tilamuutos
         // JTKJ: Exercise 3. Save the sensor value into the global variable
         //       Remember to modify state
+
+        if ((valoisuus >= 0) && (programState == WAITING)){
+            programState = DATA_READY;
+
+            ambientLight = valoisuus;
+        }
+
 
         // Just for sanity check for exercise, you can comment this out
         System_printf("sensorTask\n");
