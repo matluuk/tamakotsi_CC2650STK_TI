@@ -25,15 +25,18 @@
 #define STACKSIZE 2048
 Char sensorTaskStack[STACKSIZE];
 Char uartTaskStack[STACKSIZE];
+Char dataTaskStack[STACKSIZE];
 
 // JTKJ: Teht√§v√§ 3. Tilakoneen esittely
 // JTKJ: Exercise 3. Definition of the state machine
-enum state { WAITING=1, DATA_READY };
+enum state { WAITING=1, DATA_READY, UART_MSG_READY };
 enum state programState = WAITING;
 
 // JTKJ: Teht√§v√§ 3. Valoisuuden globaali muuttuja
 // JTKJ: Exercise 3. Global variable for ambient light
-double ambientLight = -1000.0;
+float ambientLight = -1000.0;
+char uartBuffer[10];
+float lightData[32];
 
 // JTKJ: Teht√§v√§ 1. Lis√§√§ painonappien RTOS-muuttujat ja alustus
 static PIN_Handle buttonHandle;
@@ -42,8 +45,6 @@ static PIN_Handle ledHandle;
 static PIN_State ledState;
 
 
-//test comments
-//testi
 
 PIN_Config buttonConfig[] = {
    Board_BUTTON0  | PIN_INPUT_EN | PIN_PULLUP | PIN_IRQ_NEGEDGE,
@@ -62,12 +63,51 @@ void buttonFxn(PIN_Handle handle, PIN_Id pinId) {
     uint_t pinValue = PIN_getOutputValue( Board_LED1 );
     pinValue = !pinValue;
     PIN_setOutputValue( ledHandle, Board_LED1, pinValue );
+    System_printf("button pressed!\n");
+    System_flush();
+
+    //l‰hett‰‰ datan napinpainalluksella
+    char msgg[10];
+    int i;
+    for(i = 0; i < 32; i++){
+        sprintf(msgg, "%.4f,", lightData[i]);
+        System_printf(msgg);
+        System_flush();
+    }
+    System_printf("\n");
+    System_flush();
+}
+
+static void uartFxn(UART_Handle uart, void *rxBuf, size_t len) {
+    char msg[30];
+    char msg2[30];
+   // Nyt meill‰ on siis haluttu m‰‰r‰ merkkej‰ k‰ytett‰viss‰
+   // rxBuf-taulukossa, pituus len, jota voimme k‰sitell‰ halutusti
+   // T‰ss‰ ne annetaan argumentiksi toiselle funktiolle (esimerkin vuoksi)
+   //tehdaan_jotain_nopeasti(rxBuf,len);
+
+    /*if(programState == WAITING){
+        programState = UART_MSG_READY;
+
+
+    }*/
+
+   sprintf(msg,"received: %c\n\r", uartBuffer[0]);
+   //UART_write(uart, msg, strlen(msg));
+   System_printf(msg);
+   sprintf(msg2, "rxBuf: %x, len %d", rxBuf, len);
+   System_printf(msg2);
+   System_flush;
+
+   // K‰sittelij‰n viimeisen‰ asiana siirryt‰‰n odottamaan uutta keskeytyst‰..
+   UART_read(uart, rxBuf, 1);
 }
 
 /* Task Functions */
-Void uartTaskFxn(UArg arg0, UArg arg1) {
+static void uartTaskFxn(UArg arg0, UArg arg1) {
 
     char merkkijono[32];
+    char testiviesti[] = "id:64,EAT:8,ping\n\r";
 
     // JTKJ: Teht√§v√§ 4. Lis√§√§ UARTin alustus: 9600,8n1
     // JTKJ: Exercise 4. Setup here UART connection as 9600,8n1
@@ -81,7 +121,8 @@ Void uartTaskFxn(UArg arg0, UArg arg1) {
     uartParams.writeDataMode = UART_DATA_TEXT;
     uartParams.readDataMode = UART_DATA_TEXT;
     uartParams.readEcho = UART_ECHO_OFF;
-    uartParams.readMode=UART_MODE_BLOCKING;
+    uartParams.readMode = UART_MODE_CALLBACK; // Keskeytyspohjainen vastaanotto
+    uartParams.readCallback  = &uartFxn; // K‰sittelij‰funktio
     uartParams.baudRate = 9600; // nopeus 9600baud
     uartParams.dataLength = UART_LEN_8; // 8
     uartParams.parityType = UART_PAR_NONE; // n
@@ -91,7 +132,10 @@ Void uartTaskFxn(UArg arg0, UArg arg1) {
     uart = UART_open(Board_UART0, &uartParams);
     if (uart == NULL) {
         System_abort("Error opening the UART");
-}
+    }
+
+    //k‰ynnist‰‰ datan vastaanottamisen
+    UART_read(uart, uartBuffer, 1);
 
     while (1) {
 
@@ -100,6 +144,7 @@ Void uartTaskFxn(UArg arg0, UArg arg1) {
         // JTKJ: Exercise 3. Print out sensor data as string to debug window if the state is correct
         //       Remember to modify state
 
+        /*
         if(programState == DATA_READY){
             programState = WAITING;
 
@@ -109,14 +154,18 @@ Void uartTaskFxn(UArg arg0, UArg arg1) {
 
             // JTKJ: Teht√§v√§ 4. L√§het√§ sama merkkijono UARTilla
             // JTKJ: Exercise 4. Send the same sensor data string with UART
-            UART_write(uart, merkkijono, strlen(merkkijono));
-        }
+            //UART_write(uart, merkkijono, strlen(merkkijono));
+
+            //testiviesti
+            //UART_write(uart, testiviesti, strlen(testiviesti));
+
+        }*/
 
         // Just for sanity check for exercise, you can comment this out
         //System_printf("uartTask\n");
         //System_flush();
 
-        Task_sleep(1000 / Clock_tickPeriod);
+        Task_sleep(100000 / Clock_tickPeriod);
     }
 }
 
@@ -177,6 +226,32 @@ Void sensorTaskFxn(UArg arg0, UArg arg1) {
     }
 }
 
+Void dataTaskFxn(UArg arg0, UArg arg1){
+    int i = 0;
+    char merkkijono[10];
+
+    while (1){
+
+        if(programState == DATA_READY){
+            lightData[i] = ambientLight;
+            sprintf(merkkijono,"valoisuus: %.2f luxia\n\r",ambientLight);
+            System_printf(merkkijono);
+            System_flush();
+            if (i == 32){
+                i = 0;
+            }else{
+                i++;
+            }
+            programState = WAITING;
+        }
+
+        //System_printf("dataTask\n");
+        //System_flush();
+
+        Task_sleep(100000 / Clock_tickPeriod);
+    }
+}
+
 Int main(void) {
 
     // Task variables
@@ -184,6 +259,8 @@ Int main(void) {
     Task_Params sensorTaskParams;
     Task_Handle uartTaskHandle;
     Task_Params uartTaskParams;
+    Task_Handle dataTaskHandle;
+    Task_Params dataTaskParams;
 
     // Initialize board
     Board_initGeneral();
@@ -227,6 +304,17 @@ Int main(void) {
     if (uartTaskHandle == NULL) {
         System_abort("Task create failed!");
     }
+
+
+    Task_Params_init(&dataTaskParams);
+    dataTaskParams.stackSize = STACKSIZE;
+    dataTaskParams.stack = &dataTaskStack;
+    dataTaskParams.priority=2;
+    dataTaskHandle = Task_create(dataTaskFxn, &dataTaskParams, NULL);
+    if (dataTaskHandle == NULL) {
+        System_abort("Task create failed!");
+    }
+
 
     /* Sanity check */
     System_printf("Hello world!\n");
