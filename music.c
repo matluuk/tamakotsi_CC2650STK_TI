@@ -23,6 +23,7 @@
  *
  * @return      -
  */
+/*
 void playMusic(PIN_Handle buzzerPin, int *note, int tempo){
 
     //
@@ -34,7 +35,7 @@ void playMusic(PIN_Handle buzzerPin, int *note, int tempo){
 
     char msg[10];
 
-    System_printf("fuktio\n");
+    System_printf("funktio\n");
 
     // code modifief from: https://github.com/robsoncouto/arduino-songs
     // iterate over the notes of the melody.
@@ -56,11 +57,11 @@ void playMusic(PIN_Handle buzzerPin, int *note, int tempo){
         buzzerSetFrequency(*note);
         Task_sleep(noteDuration*0.9 / Clock_tickPeriod);
 
-        /*//for testing purposes
+        for testing purposes
         sprintf(msg, "taajuus: %d\n", *note);
         System_printf(msg);
         System_flush();
-        */
+
 
         // Wait for the specified duration before playing the next note.
         Task_sleep(noteDuration*0.1 / Clock_tickPeriod);
@@ -69,4 +70,4 @@ void playMusic(PIN_Handle buzzerPin, int *note, int tempo){
         buzzerClose();
     }
 }
-
+*/
