@@ -57,6 +57,10 @@ int hedwigsTheme[] = {
     // Score from https://musescore.com/user/3811306/scores/4906610
     0,2,294,4,392,-4,466,8,440,4,392,2,587,4,523,-2,440,-2,392,-4,466,8,440,4,349,2,415,4,294,-1,294,4,392,-4,466,8,440,4,392,2,587,4,698,2,659,4,622,2,494,4,622,-4,587,8,554,4,277,2,494,4,392,-1,466,4,587,2,466,4,587,2,466,4,622,2,587,4,554,2,440,4,466,-4,587,8,554,4,277,2,294,4,587,-1,0,4,466,4,587,2,466,4,587,2,466,4,698,2,659,4,622,2,494,4,622,-4,587,8,554,4,277,2,466,4,392,-1,-1
 };
+//testi ��ni
+int testmusic[] = {
+    200, 1, 300, 2, 400, 4, -1
+};
 
 // JTKJ: Tehtävä 1. Lisää painonappien RTOS-muuttujat ja alustus
 static PIN_Handle button0Handle;
@@ -116,7 +120,7 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
 
     if(programState == WAITING){
         programState = MUSIC;
-        music = hedwigsTheme;
+        music = testmusic;
     }
 }
 
@@ -387,7 +391,7 @@ Void dataTaskFxn(UArg arg0, UArg arg1){
 }
 
 //Own functions
-int sendData(){
+void sendData(){
     //sends data
     char msgg[30];
     int i;
