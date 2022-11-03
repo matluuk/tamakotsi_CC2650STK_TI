@@ -1,6 +1,6 @@
 /* C Standard library */
 #include <stdio.h>
-
+#include <inttypes.h>
 
 /* testi kommenttia*/
 
@@ -33,10 +33,13 @@ Char sensorTaskStack[STACKSIZE];
 Char uartTaskStack[STACKSIZE];
 Char dataTaskStack[STACKSIZE];
 
-// JTKJ: Teht√§v√§ 3. Tilakoneen esittely
-// JTKJ: Exercise 3. Definition of the state machine
+//Tilamuuttujat
 enum state { WAITING=1, DATA_READY, UART_MSG_READY, MUSIC, SEND_DATA };
 enum state programState = WAITING;
+//chosen music
+int *music;
+//Menu
+
 
 //Globaalit muutujat
 float ambientLight = -1000.0;
@@ -51,8 +54,7 @@ float azData[32];
 float gxData[32];
 float gyData[32];
 float gzData[32];
-//chosen music
-int *music;
+int timeData[32];
 
 //musiikkia
 int hedwigsTheme[] = {
@@ -65,7 +67,7 @@ int testmusic[] = {
     200, 1, 300, 2, 400, 4, -1
 };
 
-// JTKJ: Teht√§v√§ 1. Lis√§√§ painonappien RTOS-muuttujat ja alustus
+// RTOS pin handles
 static PIN_Handle button0Handle;
 static PIN_State button0State;
 static PIN_Handle button1Handle;
@@ -77,6 +79,10 @@ static PIN_State buzzerState;
 // RTOS-muuttujat MPU9250-pinneille
 static PIN_Handle mpuHandle;
 static PIN_State mpuState;
+
+// RTOS:n kellomuuttujat
+Clock_Handle clkHandle;
+Clock_Params clkParams;
 
 
 PIN_Config button0Config[] = {
@@ -166,6 +172,11 @@ static void uartFxn(UART_Handle uart, void *rxBuf, size_t len) {
 
    // K‰sittelij‰n viimeisen‰ asiana siirryt‰‰n odottamaan uutta keskeytyst‰..
    UART_read(uart, rxBuf, 1);
+}
+
+// Kellokeskeytyksen k‰sittelij‰
+Void clkFxn(UArg arg0) {
+    System_printf("clkFxn\n");
 }
 
 /* Task Functions */
@@ -363,12 +374,6 @@ Void dataTaskFxn(UArg arg0, UArg arg1){
 
 
         if(programState == DATA_READY){
-            if (dataIndex == 31){
-                dataIndex = 0;
-            }else{
-                dataIndex++;
-            }
-
             lightData[dataIndex] = ambientLight;
             axData[dataIndex] = ax;
             ayData[dataIndex] = ay;
@@ -376,11 +381,21 @@ Void dataTaskFxn(UArg arg0, UArg arg1){
             gxData[dataIndex] = gx;
             gyData[dataIndex] = gy;
             gzData[dataIndex] = gz;
+            timeData[dataIndex] = Clock_getTicks()*Clock_tickPeriod/1000;//aika mikrosekunteina
+            /*
+            sprintf(merkkijono, "aika: %d\n", timeData[dataIndex]);
+            System_printf(merkkijono);
             sprintf(merkkijono,"valoisuus: %.2f luxia\n",ambientLight);
             System_printf(merkkijono);
+            */
             sprintf(merkkijono, "ax: %.2f, ay: %.2f, az: %.2f, gx: %.2f, gy: %.2f, gz: %.2f\n", ax, ay, az, gx, gy, gz);
             System_printf(merkkijono);
             System_flush();
+
+            dataIndex++;
+            if (dataIndex == 32){
+                dataIndex = 0;
+            }
 
 
             programState = WAITING;
@@ -399,24 +414,22 @@ void sendData(){
     char msgg[30];
     int i;
     int index;
-    sprintf(msgg, "ax, ay, az, gx, gy, gz, light\n");
+    sprintf(msgg, "time, ax, ay, az, gx, gy, gz, light\n");
     System_printf(msgg);
     for(i = 0; i < 32; i++){
-        //move index to start from oldest data
-        if (i < (32 - dataIndex)){
-            index = i + dataIndex;
-        } else {
-            index = i - dataIndex;
+        index = dataIndex + i;
+        if (index >= 32){
+            index = index - 32;
         }
 
-        sprintf(msgg, "%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,\n",
+        sprintf(msgg, "%08d,%.4f,%05f,%05f,%05f,%05f,%05f\n",
+                (timeData[index] - timeData[dataIndex]),
                 axData[index],
                 ayData[index],
                 azData[index],
                 gxData[index],
                 gyData[index],
-                gzData[index],
-                lightData[index]);
+                gzData[index]);
         System_printf(msgg);
         System_flush();
     }
@@ -501,13 +514,6 @@ Int main(void) {
     if(!ledHandle) {
        System_abort("Error initializing LED pins\n");
     }
-    /*
-    // Otetaan k‰yttˆˆn MPU-keskeytyspinni
-    MpuHandle = PIN_open(&MpuState, MpuConfig);
-    if (MpuHandle == NULL) {
-      System_abort("Error initializing Mpu pins\n");
-    }
-    */
 
     if (PIN_registerIntCb(button0Handle, &button0Fxn) != 0) {
        System_abort("Error registering button0 callback function");
@@ -515,10 +521,17 @@ Int main(void) {
     if (PIN_registerIntCb(button1Handle, &button1Fxn) != 0) {
        System_abort("Error registering button1 callback function");
     }
-    /*
-    if (PIN_registerIntCb(MpuHandle, &MpuFxn) != 0) {
-       System_abort("Error registering Mpu callback function");
-    }*/
+
+    // Alustetaan kello
+    Clock_Params_init(&clkParams);
+    clkParams.period = 1000000 / Clock_tickPeriod;
+    clkParams.startFlag = TRUE;
+
+    // Otetaan k‰yttˆˆn ohjelmassa
+    clkHandle = Clock_create((Clock_FuncPtr)clkFxn, 1000000 / Clock_tickPeriod, &clkParams, NULL);
+    if (clkHandle == NULL) {
+      System_abort("Clock create failed");
+    }
 
     // Buzzer
     buzzerHandle = PIN_open(&buzzerState, buzzerConfig);
@@ -533,7 +546,7 @@ Int main(void) {
     sensorTaskParams.priority=2;
     sensorTaskHandle = Task_create(sensorTaskFxn, &sensorTaskParams, NULL);
     if (sensorTaskHandle == NULL) {
-        System_abort("Task create failed!");
+        System_abort("sensorTask create failed!");
     }
 
     Task_Params_init(&dataTaskParams);
@@ -542,7 +555,7 @@ Int main(void) {
     dataTaskParams.priority=2;
     dataTaskHandle = Task_create(dataTaskFxn, &dataTaskParams, NULL);
     if (dataTaskHandle == NULL) {
-        System_abort("Task create failed!");
+        System_abort("dataTask create failed!");
     }
 
     Task_Params_init(&uartTaskParams);
@@ -551,7 +564,7 @@ Int main(void) {
     uartTaskParams.priority=2;
     uartTaskHandle = Task_create(uartTaskFxn, &uartTaskParams, NULL);
     if (uartTaskHandle == NULL) {
-        System_abort("Task create failed!");
+        System_abort("uartTask create failed!");
     }
 
     /* Sanity check */
