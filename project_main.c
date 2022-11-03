@@ -1,6 +1,9 @@
 /* C Standard library */
 #include <stdio.h>
 
+
+/* testi kommenttia*/
+
 /* XDCtools files */
 #include <xdc/std.h>
 #include <xdc/runtime/System.h>
