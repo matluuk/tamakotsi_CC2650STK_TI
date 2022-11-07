@@ -34,8 +34,10 @@ Char uartTaskStack[STACKSIZE];
 Char dataTaskStack[STACKSIZE];
 
 //Tilamuuttujat
-enum state { WAITING=1, DATA_READY, UART_MSG_READY, MUSIC, SEND_DATA };
+enum state { WAITING=1, DATA_READY, UART_MSG_READY, MUSIC, SEND_DATA, MOVE_DETECTION, MOVE_DETECTION_DATA_READY };
 enum state programState = WAITING;
+//seuraava tilamuutos
+enum state nextState;
 //chosen music
 int *music;
 //Menu
@@ -47,14 +49,15 @@ float ax, ay, az, gx, gy, gz;
 char uartBuffer[10];
 
 int dataIndex = 0;
-float lightData[32];
-float axData[32];
-float ayData[32];
-float azData[32];
-float gxData[32];
-float gyData[32];
-float gzData[32];
-int timeData[32];
+int dataSize = 52;
+float lightData[52];
+float axData[52];
+float ayData[52];
+float azData[52];
+float gxData[52];
+float gyData[52];
+float gzData[52];
+int timeData[52];
 
 //musiikkia
 int hedwigsTheme[] = {
@@ -63,9 +66,16 @@ int hedwigsTheme[] = {
     0,2,294,4,392,-4,466,8,440,4,392,2,587,4,523,-2,440,-2,392,-4,466,8,440,4,349,2,415,4,294,-1,294,4,392,-4,466,8,440,4,392,2,587,4,698,2,659,4,622,2,494,4,622,-4,587,8,554,4,277,2,494,4,392,-1,466,4,587,2,466,4,587,2,466,4,622,2,587,4,554,2,440,4,466,-4,587,8,554,4,277,2,294,4,587,-1,0,4,466,4,587,2,466,4,587,2,466,4,698,2,659,4,622,2,494,4,622,-4,587,8,554,4,277,2,466,4,392,-1,-1
 };
 //testi ääni
-int testmusic[] = {
-    200, 1, 300, 2, 400, 4, -1
+int testMusic[] = {
+    440, 4, 440, 4, 440, 4, 440, 4, 440, 4, 440, 4, 440, 4, 440, 4, 440, 4, -1
 };
+int back[] = {
+    400, 2, 200, 4, 300, 4, -1
+};
+int choose[] = {
+                300, 16, 400, 16, -1
+};
+
 
 // RTOS pin handles
 static PIN_Handle button0Handle;
@@ -129,7 +139,8 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
 
     if(programState == WAITING){
         programState = MUSIC;
-        music = testmusic;
+        nextState = WAITING;
+        music = testMusic;
     }
 }
 
@@ -138,7 +149,17 @@ void button1Fxn(PIN_Handle handle, PIN_Id pinId) {
     System_flush();
 
     if(programState == WAITING){
-        programState = SEND_DATA;
+        programState = MUSIC;
+        nextState = MOVE_DETECTION;
+        music = choose;
+        Clock_start(clkHandle);
+    } else if (programState == MOVE_DETECTION || programState == MOVE_DETECTION_DATA_READY){
+        programState = MUSIC;
+        Clock_stop(clkHandle);
+        nextState = WAITING;
+        music = back;
+        System_printf("MOVE_DETECTION stopped!\n");
+        System_flush();
     }
 }
 
@@ -177,6 +198,12 @@ static void uartFxn(UART_Handle uart, void *rxBuf, size_t len) {
 // Kellokeskeytyksen käsittelijä
 Void clkFxn(UArg arg0) {
     System_printf("clkFxn\n");
+    if (programState == MOVE_DETECTION || programState == MOVE_DETECTION_DATA_READY){
+        programState = SEND_DATA;
+        Clock_stop(clkHandle);
+        System_printf("clkFxn_state_change\n");
+    }
+    System_flush();
 }
 
 /* Task Functions */
@@ -319,16 +346,20 @@ Void sensorTaskFxn(UArg arg0, UArg arg1) {
         // JTKJ: Exercise 3. Save the sensor value into the global variable
         //       Remember to modify state
 
-        if (programState == WAITING){
-            programState = DATA_READY;
-            //open i2c
-            i2c = I2C_open(Board_I2C_TMP, &i2cParams);
-            if (i2c == NULL) {
-              System_abort("Error Initializing I2C\n");
-            }
-            ambientLight = opt3001_get_data(&i2c);
-            //close i2c
-            I2C_close(i2c);
+        //open i2c
+        i2c = I2C_open(Board_I2C_TMP, &i2cParams);
+        if (i2c == NULL) {
+          System_abort("Error Initializing I2C\n");
+        }
+        //ambientLight = opt3001_get_data(&i2c);
+
+        //close i2c
+        I2C_close(i2c);
+
+        if (programState == MOVE_DETECTION){
+            programState = MOVE_DETECTION_DATA_READY;
+
+
 
             //MPU open i2c
             i2cMPU = I2C_open(Board_I2C, &i2cMPUParams);
@@ -346,7 +377,7 @@ Void sensorTaskFxn(UArg arg0, UArg arg1) {
         //System_flush();
 
         // 5 times per second, you can modify this
-        Task_sleep(200000 / Clock_tickPeriod);
+        Task_sleep(100000 / Clock_tickPeriod);
     }
 }
 
@@ -357,23 +388,19 @@ Void dataTaskFxn(UArg arg0, UArg arg1){
 
         //soittaa musiikkia, pitäisi siirtää johonkin toiseen taskiin
         if(programState == MUSIC){
-            buzzerOpen(buzzerHandle);
-            buzzerSetFrequency(2000);
-            Task_sleep(50000 / Clock_tickPeriod);
-            buzzerClose();
-
+            programState = nextState;
             playMusic(buzzerHandle, music, 144);
-            programState = WAITING;
         }
 
         if(programState == SEND_DATA){
+            programState = WAITING;
             sendData();
             System_printf("data sent.");
-            programState = WAITING;
         }
 
 
-        if(programState == DATA_READY){
+        if(programState == MOVE_DETECTION_DATA_READY){
+            programState = MOVE_DETECTION;
             lightData[dataIndex] = ambientLight;
             axData[dataIndex] = ax;
             ayData[dataIndex] = ay;
@@ -393,18 +420,15 @@ Void dataTaskFxn(UArg arg0, UArg arg1){
             System_flush();
 
             dataIndex++;
-            if (dataIndex == 32){
+            if (dataIndex == dataSize){
                 dataIndex = 0;
             }
-
-
-            programState = WAITING;
         }
 
         //System_printf("dataTask\n");
         //System_flush();
 
-        Task_sleep(200000 / Clock_tickPeriod);
+        Task_sleep(100000 / Clock_tickPeriod);
     }
 }
 
@@ -414,16 +438,19 @@ void sendData(){
     char msgg[30];
     int i;
     int index;
-    sprintf(msgg, "time, ax, ay, az, gx, gy, gz, light\n");
+    sprintf(msgg, "[time, ax, ay, az, gx, gy, gz]\n");
     System_printf(msgg);
-    for(i = 0; i < 32; i++){
+    for(i = 0; i < dataSize; i++){
+        index = i;
+        /*
         index = dataIndex + i;
-        if (index >= 32){
-            index = index - 32;
+        if (index >= dataSize){
+            index = index - dataSize;
         }
+        */
 
-        sprintf(msgg, "%08d,%.4f,%05f,%05f,%05f,%05f,%05f\n",
-                (timeData[index] - timeData[dataIndex]),
+        sprintf(msgg, "[%08d,%.4f,%05f,%05f,%05f,%05f,%05f]\n",
+                (timeData[index] - timeData[0]),
                 axData[index],
                 ayData[index],
                 azData[index],
@@ -524,11 +551,11 @@ Int main(void) {
 
     // Alustetaan kello
     Clock_Params_init(&clkParams);
-    clkParams.period = 1000000 / Clock_tickPeriod;
-    clkParams.startFlag = TRUE;
+    clkParams.period = 5000000 / Clock_tickPeriod;
+    clkParams.startFlag = FALSE;
 
     // Otetaan käyttöön ohjelmassa
-    clkHandle = Clock_create((Clock_FuncPtr)clkFxn, 1000000 / Clock_tickPeriod, &clkParams, NULL);
+    clkHandle = Clock_create((Clock_FuncPtr)clkFxn, 5000000 / Clock_tickPeriod, &clkParams, NULL);
     if (clkHandle == NULL) {
       System_abort("Clock create failed");
     }
