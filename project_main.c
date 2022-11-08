@@ -32,10 +32,13 @@
 Char sensorTaskStack[STACKSIZE];
 Char uartTaskStack[STACKSIZE];
 Char dataTaskStack[STACKSIZE];
+Char mainTaskStack[STACKSIZE];
 
 //Tilamuuttujat
-enum state { WAITING=1, DATA_READY, UART_MSG_READY, MUSIC, SEND_DATA, MOVE_DETECTION, MOVE_DETECTION_DATA_READY };
-enum state programState = WAITING;
+enum state { MENU=1, DATA_READY, UART_MSG_READY, MUSIC, SEND_DATA, MOVE_DETECTION, MOVE_DETECTION_DATA_READY, GAME};
+enum stateMenu {MOVE, PLAY_GAME, PLAY_MUSIC};
+enum state programState = MENU;
+enum stateMenu menuState =  MOVE;
 //seuraava tilamuutos
 enum state nextState;
 //chosen music
@@ -63,19 +66,31 @@ int timeData[52];
 int hedwigsTheme[] = {
     // Hedwig's theme from the Harry Potter Movies
     // Score from https://musescore.com/user/3811306/scores/4906610
-    0,2,294,4,392,-4,466,8,440,4,392,2,587,4,523,-2,440,-2,392,-4,466,8,440,4,349,2,415,4,294,-1,294,4,392,-4,466,8,440,4,392,2,587,4,698,2,659,4,622,2,494,4,622,-4,587,8,554,4,277,2,494,4,392,-1,466,4,587,2,466,4,587,2,466,4,622,2,587,4,554,2,440,4,466,-4,587,8,554,4,277,2,294,4,587,-1,0,4,466,4,587,2,466,4,587,2,466,4,698,2,659,4,622,2,494,4,622,-4,587,8,554,4,277,2,466,4,392,-1,-1
+                      0,2,294,4,392,-4,466,8,440,4,392,2,587,4,523,-2,440,-2,392,-4,466,8,440,4,349,2,415,4,294,-1,294,4,392,-4,466,8,440,4,392,2,587,4,698,2,659,4,622,2,494,4,622,-4,587,8,554,4,277,2,494,4,392,-1,466,4,587,2,466,4,587,2,466,4,622,2,587,4,554,2,440,4,466,-4,587,8,554,4,277,2,294,4,587,-1,0,4,466,4,587,2,466,4,587,2,466,4,698,2,659,4,622,2,494,4,622,-4,587,8,554,4,277,2,466,4,392,-1,-1
 };
 //testi ‰‰ni
 int testMusic[] = {
-    440, 4, 440, 4, 440, 4, 440, 4, 440, 4, 440, 4, 440, 4, 440, 4, 440, 4, -1
+                   440, 4, 440, 4, 440, 4, 440, 4, 440, 4, 440, 4, 440, 4, 440, 4, 440, 4, -1
 };
 int back[] = {
-    400, 2, 200, 4, 300, 4, -1
+              400, 2, 200, 4, 300, 4, -1
 };
 int choose[] = {
                 300, 16, 400, 16, -1
 };
+int move[] = {
+              340, 16, 400, 16,300, 16, 400, 16, -1
+};
+int game[] = {
+                170, 8, 300, 16, 300, 8, 500, 16 -1
+};
+int music1[] = {
+                89, 16, 210, 16, -1
+};
 
+//prototyypit funktioille
+void playMusic(PIN_Handle buzzerPin, int *note, int tempo);
+void sendData();
 
 // RTOS pin handles
 static PIN_Handle button0Handle;
@@ -105,10 +120,16 @@ PIN_Config button1Config[] = {
    PIN_TERMINATE
 };
 
-PIN_Config ledConfig[] = {
+PIN_Config led1Config[] = {
    Board_LED1 | PIN_GPIO_OUTPUT_EN | PIN_GPIO_LOW | PIN_PUSHPULL | PIN_DRVSTR_MAX,
    PIN_TERMINATE
 };
+
+PIN_Config led0Config[] = {
+   Board_LED0 | PIN_GPIO_OUTPUT_EN | PIN_GPIO_LOW | PIN_PUSHPULL | PIN_DRVSTR_MAX,
+   PIN_TERMINATE
+};
+
 PIN_Config buzzerConfig[] = {
   Board_BUZZER | PIN_GPIO_OUTPUT_EN | PIN_GPIO_LOW | PIN_PUSHPULL | PIN_DRVSTR_MAX,
   PIN_TERMINATE
@@ -131,37 +152,87 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
 
     // JTKJ: Teht√§v√§ 1. Vilkuta jompaa kumpaa ledi√§
     // JTKJ: Exercise 1. Blink either led of the device
-    uint_t pinValue = PIN_getOutputValue( Board_LED1 );
-    pinValue = !pinValue;
-    PIN_setOutputValue( ledHandle, Board_LED1, pinValue );
+
     System_printf("button0 pressed!\n");
     System_flush();
 
-    if(programState == WAITING){
-        programState = MUSIC;
-        nextState = WAITING;
-        music = testMusic;
-    }
-}
+    if(programState == MENU) {
+        switch(menuState){
+            case MOVE:
+                programState = MUSIC;
+                nextState = MOVE_DETECTION;
+                music = choose;
+                Clock_start(clkHandle);
+                break;
 
-void button1Fxn(PIN_Handle handle, PIN_Id pinId) {
-    System_printf("button1 pressed!\n");
-    System_flush();
+            case PLAY_GAME:
+                //LED_PLAY_GAME;
+                System_printf("Led-game not ready.\n");
+                break;
 
-    if(programState == WAITING){
-        programState = MUSIC;
-        nextState = MOVE_DETECTION;
-        music = choose;
-        Clock_start(clkHandle);
+            case PLAY_MUSIC:
+                programState = MUSIC;
+                System_printf("Playing music.\n");
+                music = hedwigsTheme;
+                nextState = MENU;
+                break;
+            default:
+                System_printf("ERROR, invalid menuState\n");
+        }
+        System_flush();
     } else if (programState == MOVE_DETECTION || programState == MOVE_DETECTION_DATA_READY){
         programState = MUSIC;
         Clock_stop(clkHandle);
-        nextState = WAITING;
+        nextState = MENU;
         music = back;
         System_printf("MOVE_DETECTION stopped!\n");
         System_flush();
+    }/* else if (programState == GAME{
+        Led-pelin totetus
+    }*/
+}
+
+
+void button1Fxn(PIN_Handle handle, PIN_Id pinId) {
+    uint_t pinValue_1 = PIN_getOutputValue( Board_LED1 ); //punainen led
+    uint_t pinValue_0 = PIN_getOutputValue( Board_LED0 ); //vihre‰ led
+    System_printf("button1 pressed!\n");
+    System_flush();
+
+    if(programState == MENU) {
+        switch(menuState){
+            case MOVE:
+                System_printf("b0: start led-game\nb1: next state\n---\n");
+                //molemmat ledit p‰‰lle
+                pinValue_1 = !pinValue_1;
+                PIN_setOutputValue( ledHandle, Board_LED1, pinValue_1 );
+                menuState = PLAY_GAME;
+                break;
+
+            case PLAY_GAME:
+                System_printf("b0: listen music\nb1: next state\n---\n");
+                //vain punainen led p‰‰lle
+                pinValue_0 = !pinValue_0;
+                PIN_setOutputValue( ledHandle, Board_LED0, pinValue_0 );
+                menuState = PLAY_MUSIC;
+                break;
+
+            case PLAY_MUSIC:
+                System_printf("b0: Move your tamagotchi\nb1: next state\n---\n");
+                //vain vihre‰ led p‰‰lle
+                pinValue_0 = !pinValue_0;
+                PIN_setOutputValue( ledHandle, Board_LED0, pinValue_0 );
+                pinValue_1 = !pinValue_1;
+                PIN_setOutputValue( ledHandle, Board_LED1, pinValue_1 );
+                menuState = MOVE;
+                break;
+            default:
+                System_printf("ERROR, invalid menuState\n");
+        }
+        System_flush();
     }
 }
+
 
 /*
 Void mpuFxn(PIN_Handle mpuHandle, PIN_Id pinId) {
@@ -178,7 +249,7 @@ static void uartFxn(UART_Handle uart, void *rxBuf, size_t len) {
    // T‰ss‰ ne annetaan argumentiksi toiselle funktiolle (esimerkin vuoksi)
    //tehdaan_jotain_nopeasti(rxBuf,len);
 
-    /*if(programState == WAITING){
+    /*if(programState == MENU){
         programState = UART_MSG_READY;
 
 
@@ -246,7 +317,7 @@ static void uartTaskFxn(UArg arg0, UArg arg1) {
 
         /*
         if(programState == DATA_READY){
-            programState = WAITING;
+            programState = MENU;
 
             sprintf(merkkijono,"valoisuus: %.2f luxia\n\r",ambientLight);
             System_printf(merkkijono);
@@ -381,19 +452,32 @@ Void sensorTaskFxn(UArg arg0, UArg arg1) {
     }
 }
 
+Void mainTaskFxn(UArg arg0, UArg arg1) {
+    //vihre‰ led palaa aluksi
+    System_printf("b0: Move your tamagotchi\nb1: next state\n---\n");
+    uint_t pinValue_0 = PIN_getOutputValue( Board_LED0 );
+    pinValue_0 = !pinValue_0;
+    PIN_setOutputValue( ledHandle, Board_LED0, pinValue_0 );
+
+    while (1){
+
+        //soittaa musiikkia
+        if(programState == MUSIC){
+            playMusic(buzzerHandle, music, 144);
+            programState = nextState;
+
+        }
+        Task_sleep(100000 / Clock_tickPeriod);
+    }
+}
+
 Void dataTaskFxn(UArg arg0, UArg arg1){
     char merkkijono[10];
 
     while (1){
 
-        //soittaa musiikkia, pit‰isi siirt‰‰ johonkin toiseen taskiin
-        if(programState == MUSIC){
-            programState = nextState;
-            playMusic(buzzerHandle, music, 144);
-        }
-
         if(programState == SEND_DATA){
-            programState = WAITING;
+            programState = MENU;
             sendData();
             System_printf("data sent.");
         }
@@ -464,8 +548,6 @@ void sendData(){
 
 void playMusic(PIN_Handle buzzerPin, int *note, int tempo){
 
-    //
-
     // this calculates the duration of a whole note in ms (60s/tempo)*4 beats
     int wholenote = (60000000 * 4) / tempo;
 
@@ -473,7 +555,7 @@ void playMusic(PIN_Handle buzzerPin, int *note, int tempo){
 
     //char msg[10];
 
-    System_printf("funktio\n");
+
 
     // code modifief from: https://github.com/robsoncouto/arduino-songs
     // iterate over the notes of the melody.
@@ -518,6 +600,9 @@ Int main(void) {
     Task_Params uartTaskParams;
     Task_Handle dataTaskHandle;
     Task_Params dataTaskParams;
+    Task_Handle mainTaskHandle;
+    Task_Params mainTaskParams;
+
 
     // Initialize board
     Board_initGeneral();
@@ -537,9 +622,13 @@ Int main(void) {
     if(!button1Handle) {
         System_abort("Error initializing button1 pins\n");
     }
-    ledHandle = PIN_open(&ledState, ledConfig);
+    ledHandle = PIN_open(&ledState, led1Config);
     if(!ledHandle) {
        System_abort("Error initializing LED pins\n");
+    }
+    ledHandle = PIN_open(&ledState, led0Config);
+    if(!ledHandle) {
+    System_abort("Error initializing LED pins\n");
     }
 
     if (PIN_registerIntCb(button0Handle, &button0Fxn) != 0) {
@@ -567,6 +656,14 @@ Int main(void) {
     }
 
     /* Task */
+    Task_Params_init(&mainTaskParams);
+    mainTaskParams.stackSize = STACKSIZE;
+    mainTaskParams.stack = &mainTaskStack;
+    mainTaskParams.priority=2;
+    mainTaskHandle = Task_create(mainTaskFxn, &mainTaskParams, NULL);
+    if (mainTaskHandle == NULL) {
+        System_abort("mainTask create failed!");
+    }
     Task_Params_init(&sensorTaskParams);
     sensorTaskParams.stackSize = STACKSIZE;
     sensorTaskParams.stack = &sensorTaskStack;
