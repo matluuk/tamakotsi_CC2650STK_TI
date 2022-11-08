@@ -82,7 +82,7 @@ int move[] = {
               340, 16, 400, 16,300, 16, 400, 16, -1
 };
 int game[] = {
-                170, 8, 300, 16, 300, 8, 500, 16 -1
+                170, 8, 300, 16, 300, 8, 500, 16, -1
 };
 int music1[] = {
                 89, 16, 210, 16, -1
@@ -166,8 +166,10 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
                 break;
 
             case PLAY_GAME:
-                //LED_PLAY_GAME;
-                System_printf("Led-game not ready.\n");
+                //led-game;
+                programState = GAME;
+                System_printf("Paina b1, kun vihre‰ led syttyy.\nPaina b0, kun punainen led syttyy.\n");
+                nextState = MENU;
                 break;
 
             case PLAY_MUSIC:
@@ -188,7 +190,14 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
         System_printf("MOVE_DETECTION stopped!\n");
         System_flush();
     }/* else if (programState == GAME{
-        Led-pelin totetus
+        programState = MUSIC;
+
+        pelin toteutus erillisess‰ funktiossa
+
+        nextState = MENU;
+        System_printf("LED_GAME stopped!\n");
+        System_flush();
+
     }*/
 }
 
@@ -206,6 +215,9 @@ void button1Fxn(PIN_Handle handle, PIN_Id pinId) {
                 //molemmat ledit p‰‰lle
                 pinValue_1 = !pinValue_1;
                 PIN_setOutputValue( ledHandle, Board_LED1, pinValue_1 );
+                programState = MUSIC;
+                nextState = MENU;
+                music = game;
                 menuState = PLAY_GAME;
                 break;
 
@@ -214,6 +226,9 @@ void button1Fxn(PIN_Handle handle, PIN_Id pinId) {
                 //vain punainen led p‰‰lle
                 pinValue_0 = !pinValue_0;
                 PIN_setOutputValue( ledHandle, Board_LED0, pinValue_0 );
+                programState = MUSIC;
+                nextState = MENU;
+                music = music1;
                 menuState = PLAY_MUSIC;
                 break;
 
@@ -224,6 +239,9 @@ void button1Fxn(PIN_Handle handle, PIN_Id pinId) {
                 PIN_setOutputValue( ledHandle, Board_LED0, pinValue_0 );
                 pinValue_1 = !pinValue_1;
                 PIN_setOutputValue( ledHandle, Board_LED1, pinValue_1 );
+                programState = MUSIC;
+                nextState = MENU;
+                music = move;
                 menuState = MOVE;
                 break;
             default:
@@ -656,14 +674,6 @@ Int main(void) {
     }
 
     /* Task */
-    Task_Params_init(&mainTaskParams);
-    mainTaskParams.stackSize = STACKSIZE;
-    mainTaskParams.stack = &mainTaskStack;
-    mainTaskParams.priority=2;
-    mainTaskHandle = Task_create(mainTaskFxn, &mainTaskParams, NULL);
-    if (mainTaskHandle == NULL) {
-        System_abort("mainTask create failed!");
-    }
     Task_Params_init(&sensorTaskParams);
     sensorTaskParams.stackSize = STACKSIZE;
     sensorTaskParams.stack = &sensorTaskStack;
@@ -689,6 +699,15 @@ Int main(void) {
     uartTaskHandle = Task_create(uartTaskFxn, &uartTaskParams, NULL);
     if (uartTaskHandle == NULL) {
         System_abort("uartTask create failed!");
+    }
+
+    Task_Params_init(&mainTaskParams);
+    mainTaskParams.stackSize = STACKSIZE;
+    mainTaskParams.stack = &mainTaskStack;
+    mainTaskParams.priority=2;
+    mainTaskHandle = Task_create(mainTaskFxn, &mainTaskParams, NULL);
+    if (mainTaskHandle == NULL) {
+        System_abort("mainTask create failed!");
     }
 
     /* Sanity check */
