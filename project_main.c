@@ -49,15 +49,15 @@ float ax, ay, az, gx, gy, gz;
 char uartBuffer[10];
 
 int dataIndex = 0;
-int dataSize = 52;
-float lightData[52];
-float axData[52];
-float ayData[52];
-float azData[52];
-float gxData[52];
-float gyData[52];
-float gzData[52];
-int timeData[52];
+int dataSize = 110;
+float lightData[110];
+float axData[110];
+float ayData[110];
+float azData[110];
+float gxData[110];
+float gyData[110];
+float gzData[110];
+int timeData[110];
 
 //musiikkia
 int hedwigsTheme[] = {
@@ -377,7 +377,7 @@ Void sensorTaskFxn(UArg arg0, UArg arg1) {
         //System_flush();
 
         // 5 times per second, you can modify this
-        Task_sleep(100000 / Clock_tickPeriod);
+        Task_sleep(50000 / Clock_tickPeriod);
     }
 }
 
@@ -428,7 +428,7 @@ Void dataTaskFxn(UArg arg0, UArg arg1){
         //System_printf("dataTask\n");
         //System_flush();
 
-        Task_sleep(100000 / Clock_tickPeriod);
+        Task_sleep(50000 / Clock_tickPeriod);
     }
 }
 
@@ -449,7 +449,7 @@ void sendData(){
         }
         */
 
-        sprintf(msgg, "[%08d,%.4f,%05f,%05f,%05f,%05f,%05f]\n",
+        sprintf(msgg, "%08d,%.4f,%05f,%05f,%05f,%05f,%05f\n",
                 (timeData[index] - timeData[0]),
                 axData[index],
                 ayData[index],
