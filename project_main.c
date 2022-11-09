@@ -61,6 +61,7 @@ float gxData[110];
 float gyData[110];
 float gzData[110];
 int timeData[110];
+int clockTicks = 0;
 
 //musiikkia
 int hedwigsTheme[] = {
@@ -108,6 +109,10 @@ static PIN_State mpuState;
 // RTOS:n kellomuuttujat
 Clock_Handle clkHandle;
 Clock_Params clkParams;
+Clock_Handle clkGameHandle;
+Clock_Params clkGameParams;
+
+
 
 
 PIN_Config button0Config[] = {
@@ -134,6 +139,8 @@ PIN_Config buzzerConfig[] = {
   Board_BUZZER | PIN_GPIO_OUTPUT_EN | PIN_GPIO_LOW | PIN_PUSHPULL | PIN_DRVSTR_MAX,
   PIN_TERMINATE
 };
+
+
 // MPU9250-pin settings
 /*
 static PIN_Config mpuConfig[] = {
@@ -189,22 +196,17 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
         music = back;
         System_printf("MOVE_DETECTION stopped!\n");
         System_flush();
-    }/* else if (programState == GAME{
+    } else if (programState == GAME) {
         programState = MUSIC;
-
-        pelin toteutus erillisessä funktiossa
-
+        //Clock_stop(clkGameHandle);
         nextState = MENU;
-        System_printf("LED_GAME stopped!\n");
+        System_printf("GAME stopped!\n");
         System_flush();
-
-    }*/
+    }
 }
 
 
 void button1Fxn(PIN_Handle handle, PIN_Id pinId) {
-    uint_t pinValue_1 = PIN_getOutputValue( Board_LED1 ); //punainen led
-    uint_t pinValue_0 = PIN_getOutputValue( Board_LED0 ); //vihreä led
     System_printf("button1 pressed!\n");
     System_flush();
 
@@ -213,8 +215,8 @@ void button1Fxn(PIN_Handle handle, PIN_Id pinId) {
             case MOVE:
                 System_printf("b0: start led-game\nb1: next state\n---\n");
                 //molemmat ledit päälle
-                pinValue_1 = !pinValue_1;
-                PIN_setOutputValue( ledHandle, Board_LED1, pinValue_1 );
+                PIN_setOutputValue( ledHandle, Board_LED0, 1 );
+                PIN_setOutputValue( ledHandle, Board_LED1, 1 );
                 programState = MUSIC;
                 nextState = MENU;
                 music = game;
@@ -224,8 +226,8 @@ void button1Fxn(PIN_Handle handle, PIN_Id pinId) {
             case PLAY_GAME:
                 System_printf("b0: listen music\nb1: next state\n---\n");
                 //vain punainen led päälle
-                pinValue_0 = !pinValue_0;
-                PIN_setOutputValue( ledHandle, Board_LED0, pinValue_0 );
+                PIN_setOutputValue( ledHandle, Board_LED0, 1 );
+                PIN_setOutputValue( ledHandle, Board_LED1, 0 );
                 programState = MUSIC;
                 nextState = MENU;
                 music = music1;
@@ -235,10 +237,8 @@ void button1Fxn(PIN_Handle handle, PIN_Id pinId) {
             case PLAY_MUSIC:
                 System_printf("b0: Move your tamagotchi\nb1: next state\n---\n");
                 //vain vihreä led päälle
-                pinValue_0 = !pinValue_0;
-                PIN_setOutputValue( ledHandle, Board_LED0, pinValue_0 );
-                pinValue_1 = !pinValue_1;
-                PIN_setOutputValue( ledHandle, Board_LED1, pinValue_1 );
+                PIN_setOutputValue( ledHandle, Board_LED0, 0 );
+                PIN_setOutputValue( ledHandle, Board_LED1, 1 );
                 programState = MUSIC;
                 nextState = MENU;
                 music = move;
@@ -292,6 +292,23 @@ Void clkFxn(UArg arg0) {
         Clock_stop(clkHandle);
         System_printf("clkFxn_state_change\n");
     }
+    System_flush();
+}
+
+Void clkGameFxn(UArg arg0) {
+    System_printf("clkGameFxn\n");
+    //uint_t pinValue_0 = PIN_getOutputValue( Board_LED0 ); //vihreä led
+    //uint_t pinValue_1 = PIN_getOutputValue( Board_LED1 ); //punainen led
+    //if (programState == GAME) {
+     //b01, kun vihreä, b0 kun punainen led (ei tähän funktioon)
+     //while(1) {
+        //pinValue_0 = !pinValue_0;
+        //PIN_setOutputValue( ledHandle, Board_LED0, pinValue_0 );
+
+        //pinValue_1 = !pinValue_1;
+        //PIN_setOutputValue( ledHandle, Board_LED1, pinValue_1 );
+      //}
+   // }
     System_flush();
 }
 
@@ -661,9 +678,20 @@ Int main(void) {
     clkParams.period = 5000000 / Clock_tickPeriod;
     clkParams.startFlag = FALSE;
 
-    // Otetaan käyttöön ohjelmassa
+    // Otetaan kello käyttöön ohjelmassa
     clkHandle = Clock_create((Clock_FuncPtr)clkFxn, 5000000 / Clock_tickPeriod, &clkParams, NULL);
     if (clkHandle == NULL) {
+      System_abort("Clock create failed");
+    }
+
+    // Alustetaan pelikello
+    Clock_Params_init(&clkGameParams);
+    clkGameParams.period = 500000 / Clock_tickPeriod;
+    clkGameParams.startFlag = FALSE;
+
+    // Otetaan pelikello käyttöön ohjelmassa
+    clkGameHandle = Clock_create((Clock_FuncPtr)clkGameFxn, 500000 / Clock_tickPeriod, &clkGameParams, NULL);
+    if (clkGameHandle == NULL) {
       System_abort("Clock create failed");
     }
 
