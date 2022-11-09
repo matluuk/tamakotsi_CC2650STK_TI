@@ -30,7 +30,7 @@
 /* Task */
 #define STACKSIZE 2048
 Char sensorTaskStack[STACKSIZE];
-Char uartTaskStack[STACKSIZE];
+//Char uartTaskStack[STACKSIZE];
 Char dataTaskStack[STACKSIZE];
 Char mainTaskStack[STACKSIZE];
 
@@ -69,8 +69,8 @@ int hedwigsTheme[] = {
                       0,2,294,4,392,-4,466,8,440,4,392,2,587,4,523,-2,440,-2,392,-4,466,8,440,4,349,2,415,4,294,-1,294,4,392,-4,466,8,440,4,392,2,587,4,698,2,659,4,622,2,494,4,622,-4,587,8,554,4,277,2,494,4,392,-1,466,4,587,2,466,4,587,2,466,4,622,2,587,4,554,2,440,4,466,-4,587,8,554,4,277,2,294,4,587,-1,0,4,466,4,587,2,466,4,587,2,466,4,698,2,659,4,622,2,494,4,622,-4,587,8,554,4,277,2,466,4,392,-1,-1
 };
 //testi ääni
-int testMusic[] = {
-                   440, 4, 440, 4, 440, 4, 440, 4, 440, 4, 440, 4, 440, 4, 440, 4, 440, 4, -1
+int dataReady[] = {
+                   440, 4, 550, 8, 660, 16, 660, 16, 440, 4, 440, 4, -1
 };
 int back[] = {
               400, 2, 200, 4, 300, 4, -1
@@ -174,7 +174,6 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
 
             case PLAY_MUSIC:
                 programState = MUSIC;
-                System_printf("Playing music.\n");
                 music = hedwigsTheme;
                 nextState = MENU;
                 break;
@@ -182,14 +181,20 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
                 System_printf("ERROR, invalid menuState\n");
         }
         System_flush();
+    } else if (programState == MUSIC) {
+        programState = MENU;
+        System_printf("programState: MENU\n");
+        System_flush();
     } else if (programState == MOVE_DETECTION || programState == MOVE_DETECTION_DATA_READY){
         programState = MUSIC;
-        Clock_stop(clkHandle);
         nextState = MENU;
+        Clock_stop(clkHandle);
         music = back;
         System_printf("MOVE_DETECTION stopped!\n");
         System_flush();
-    }/* else if (programState == GAME{
+    }
+
+    /* else if (programState == GAME{
         programState = MUSIC;
 
         pelin toteutus erillisessä funktiossa
@@ -288,7 +293,9 @@ static void uartFxn(UART_Handle uart, void *rxBuf, size_t len) {
 Void clkFxn(UArg arg0) {
     System_printf("clkFxn\n");
     if (programState == MOVE_DETECTION || programState == MOVE_DETECTION_DATA_READY){
-        programState = SEND_DATA;
+        programState = MUSIC;
+        nextState = SEND_DATA;
+        music = dataReady;
         Clock_stop(clkHandle);
         System_printf("clkFxn_state_change\n");
     }
@@ -296,6 +303,7 @@ Void clkFxn(UArg arg0) {
 }
 
 /* Task Functions */
+/*
 static void uartTaskFxn(UArg arg0, UArg arg1) {
 
     char merkkijono[32];
@@ -353,10 +361,10 @@ static void uartTaskFxn(UArg arg0, UArg arg1) {
         // Just for sanity check for exercise, you can comment this out
         //System_printf("uartTask\n");
         //System_flush();
-
+        /*
         Task_sleep(200000 / Clock_tickPeriod);
     }
-}
+}*/
 
 Void sensorTaskFxn(UArg arg0, UArg arg1) {
 
@@ -465,7 +473,7 @@ Void sensorTaskFxn(UArg arg0, UArg arg1) {
         //System_printf("sensorTask\n");
         //System_flush();
 
-        // 5 times per second, you can modify this
+        // 20 times per second, you can modify this
         Task_sleep(50000 / Clock_tickPeriod);
     }
 }
@@ -481,9 +489,12 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
 
         //soittaa musiikkia
         if(programState == MUSIC){
+            System_printf("Playing music.\n");
+            System_flush();
             playMusic(buzzerHandle, music, 144);
             programState = nextState;
-
+            System_printf("programState: nextState\n");
+            System_flush();
         }
         Task_sleep(100000 / Clock_tickPeriod);
     }
@@ -495,13 +506,13 @@ Void dataTaskFxn(UArg arg0, UArg arg1){
     while (1){
 
         if(programState == SEND_DATA){
-            programState = MENU;
+            programState = MUSIC;
+            nextState = MENU;
+            music = back;
             sendData();
             System_printf("data sent.");
-        }
-
-
-        if(programState == MOVE_DETECTION_DATA_READY){
+        } else if(programState == MOVE_DETECTION_DATA_READY)
+        {
             programState = MOVE_DETECTION;
             lightData[dataIndex] = ambientLight;
             axData[dataIndex] = ax;
@@ -578,34 +589,42 @@ void playMusic(PIN_Handle buzzerPin, int *note, int tempo){
     // code modifief from: https://github.com/robsoncouto/arduino-songs
     // iterate over the notes of the melody.
     // Remember, the array is twice the number of notes (notes + durations)
+
     for (note; *note != -1; note = note + 2) {
-        // calculates the duration of each note
-        divider = *(note + 1);
-        if (divider > 0) {
-            // regular note, just proceed
-            noteDuration = (wholenote) / divider;
-        } else if (divider < 0) {
-            // dotted notes are represented with negative durations!!
-            noteDuration = (wholenote) / abs(divider);
-            noteDuration *= 1.5; // increases the duration in half for dotted notes
+        if (programState == MUSIC) {
+            // calculates the duration of each note
+            divider = *(note + 1);
+            if (divider > 0) {
+                // regular note, just proceed
+                noteDuration = (wholenote) / divider;
+            } else if (divider < 0) {
+                // dotted notes are represented with negative durations!!
+                noteDuration = (wholenote) / abs(divider);
+                noteDuration *= 1.5; // increases the duration in half for dotted notes
+            }
+
+            // we only play the note for 90% of the duration, leaving 10% as a pause
+            buzzerOpen(buzzerPin);
+            buzzerSetFrequency(*note);
+            Task_sleep(noteDuration*0.9 / Clock_tickPeriod);
+
+            /*for testing purposes
+            sprintf(msg, "taajuus: %d\n", *note);
+            System_printf(msg);
+            System_flush();
+            */
+
+            // stop the waveform generation before the next note.
+            buzzerClose();
+
+            // Wait for the specified duration before playing the next note.
+            Task_sleep(noteDuration*0.1 / Clock_tickPeriod);
+        } else {
+            nextState = MENU;
+            System_printf("Music stop!\n");
+            System_flush();
+            break;
         }
-
-        // we only play the note for 90% of the duration, leaving 10% as a pause
-        buzzerOpen(buzzerPin);
-        buzzerSetFrequency(*note);
-        Task_sleep(noteDuration*0.9 / Clock_tickPeriod);
-
-        /*for testing purposes
-        sprintf(msg, "taajuus: %d\n", *note);
-        System_printf(msg);
-        System_flush();
-        */
-
-        // stop the waveform generation before the next note.
-        buzzerClose();
-
-        // Wait for the specified duration before playing the next note.
-        Task_sleep(noteDuration*0.1 / Clock_tickPeriod);
     }
 }
 
@@ -614,8 +633,8 @@ Int main(void) {
     // Task variables
     Task_Handle sensorTaskHandle;
     Task_Params sensorTaskParams;
-    Task_Handle uartTaskHandle;
-    Task_Params uartTaskParams;
+    //Task_Handle uartTaskHandle;
+    //Task_Params uartTaskParams;
     Task_Handle dataTaskHandle;
     Task_Params dataTaskParams;
     Task_Handle mainTaskHandle;
@@ -691,7 +710,7 @@ Int main(void) {
     if (dataTaskHandle == NULL) {
         System_abort("dataTask create failed!");
     }
-
+    /*
     Task_Params_init(&uartTaskParams);
     uartTaskParams.stackSize = STACKSIZE;
     uartTaskParams.stack = &uartTaskStack;
@@ -700,6 +719,7 @@ Int main(void) {
     if (uartTaskHandle == NULL) {
         System_abort("uartTask create failed!");
     }
+    */
 
     Task_Params_init(&mainTaskParams);
     mainTaskParams.stackSize = STACKSIZE;
