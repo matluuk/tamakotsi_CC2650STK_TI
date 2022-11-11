@@ -107,10 +107,12 @@ static PIN_Handle mpuHandle;
 static PIN_State mpuState;
 
 // RTOS:n kellomuuttujat
-Clock_Handle clkHandle;
-Clock_Params clkParams;
+Clock_Handle clkmasaHandle;
+Clock_Params clkmasaParams;
 Clock_Handle clkGameHandle;
 Clock_Params clkGameParams;
+Clock_Handle clkHandle;
+Clock_Params clkParams;
 
 
 
@@ -169,7 +171,7 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
                 programState = MUSIC;
                 nextState = MOVE_DETECTION;
                 music = choose;
-                Clock_start(clkHandle);
+                Clock_start(clkmasaHandle);
                 break;
 
             case PLAY_GAME:
@@ -195,13 +197,13 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
     } else if (programState == MOVE_DETECTION || programState == MOVE_DETECTION_DATA_READY){
         programState = MUSIC;
         nextState = MENU;
-        Clock_stop(clkHandle);
+        Clock_stop(clkmasaHandle);
         music = back;
         System_printf("MOVE_DETECTION stopped!\n");
         System_flush();
     } else if (programState == GAME) {
         programState = MUSIC;
-        //Clock_stop(clkGameHandle);
+        //Clock_stop(clkmasaGameHandle);
         nextState = MENU;
         System_printf("GAME stopped!\n");
         System_flush();
@@ -288,15 +290,21 @@ static void uartFxn(UART_Handle uart, void *rxBuf, size_t len) {
 }
 
 // Kellokeskeytyksen kï¿½sittelijï¿½
-Void clkFxn(UArg arg0) {
-    System_printf("clkFxn\n");
+Void clkmasaFxn(UArg arg0) {
+    System_printf("clkmasaFxn\n");
     if (programState == MOVE_DETECTION || programState == MOVE_DETECTION_DATA_READY){
         programState = MUSIC;
         nextState = SEND_DATA;
         music = dataReady;
-        Clock_stop(clkHandle);
-        System_printf("clkFxn_state_change\n");
+        Clock_stop(clkmasaHandle);
+        System_printf("clkmasaFxn_state_change\n");
     }
+    System_flush();
+}
+
+Void clkFxn(UArg arg0) {
+    System_printf("clkFxn\n");
+    //tähän koodia
     System_flush();
 }
 
@@ -691,13 +699,13 @@ Int main(void) {
     }
 
     // Alustetaan kello
-    Clock_Params_init(&clkParams);
-    clkParams.period = 5000000 / Clock_tickPeriod;
-    clkParams.startFlag = FALSE;
+    Clock_Params_init(&clkmasaParams);
+    clkmasaParams.period = 5000000 / Clock_tickPeriod;
+    clkmasaParams.startFlag = FALSE;
 
     // Otetaan kello kï¿½yttï¿½ï¿½n ohjelmassa
-    clkHandle = Clock_create((Clock_FuncPtr)clkFxn, 5000000 / Clock_tickPeriod, &clkParams, NULL);
-    if (clkHandle == NULL) {
+    clkmasaHandle = Clock_create((Clock_FuncPtr)clkmasaFxn, 5000000 / Clock_tickPeriod, &clkmasaParams, NULL);
+    if (clkmasaHandle == NULL) {
       System_abort("Clock create failed");
     }
 
@@ -711,6 +719,19 @@ Int main(void) {
     if (clkGameHandle == NULL) {
       System_abort("Clock create failed");
     }
+
+
+    // Alustetaan valoisuuskello
+    Clock_Params_init(&clkParams);
+    clkParams.period = 500000 / Clock_tickPeriod;
+    clkParams.startFlag = TRUE;
+
+    // Otetaan valoisuuskello kï¿½yttï¿½ï¿½n ohjelmassa
+    clkHandle = Clock_create((Clock_FuncPtr)clkFxn, 500000 / Clock_tickPeriod, &clkParams, NULL);
+    if (clkHandle == NULL) {
+    System_abort("Clock create failed");
+    }
+
 
     // Buzzer
     buzzerHandle = PIN_open(&buzzerState, buzzerConfig);
