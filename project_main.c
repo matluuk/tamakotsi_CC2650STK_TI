@@ -111,8 +111,11 @@ static PIN_Handle mpuHandle;
 static PIN_State mpuState;
 
 // RTOS:n kellomuuttujat
+Clock_Handle clkmasaHandle;
+Clock_Params clkmasaParams;
 Clock_Handle clkHandle;
 Clock_Params clkParams;
+
 
 
 PIN_Config button0Config[] = {
@@ -174,7 +177,7 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
                 programState = MUSIC;
                 nextState = MOVE_DETECTION;
                 music = choose;
-                Clock_start(clkHandle);
+                Clock_start(clkmasaHandle);
                 break;
 
             case PLAY_GAME:
@@ -201,7 +204,7 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
     } else if (programState == MOVE_DETECTION || programState == MOVE_DETECTION_DATA_READY){
         programState = MUSIC;
         nextState = MENU;
-        Clock_stop(clkHandle);
+        Clock_stop(clkmasaHandle);
         music = back;
         System_printf("MOVE_DETECTION stopped!\n");
         System_flush();
@@ -315,18 +318,23 @@ static void uartFxn(UART_Handle uart, void *rxBuf, size_t len) {
 }
 
 // Kellokeskeytyksen kï¿½sittelijï¿½
-Void clkFxn(UArg arg0) {
-    System_printf("clkFxn\n");
+Void clkmasaFxn(UArg arg0) {
+    System_printf("clkmasaFxn\n");
     if (programState == MOVE_DETECTION || programState == MOVE_DETECTION_DATA_READY){
         programState = MUSIC;
         nextState = SEND_DATA;
         music = dataReady;
-        Clock_stop(clkHandle);
-        System_printf("clkFxn_state_change\n");
+        Clock_stop(clkmasaHandle);
+        System_printf("clkmasaFxn_state_change\n");
     }
     System_flush();
 }
 
+Void clkFxn(UArg arg0) {
+    System_printf("clkFxn\n");
+    //tï¿½hï¿½n koodia
+    System_flush();
+}
 
 /* Task Functions */
 /*
@@ -528,7 +536,7 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
             gameEndTime = clockTicks + 15000000;
 
             //ledBlinkTime = clockTicks + 1000000;
-            //LED0 = punainen, LED1 = vihreä
+            //LED0 = punainen, LED1 = vihreï¿½
 
             pinValue_0 = PIN_getOutputValue( Board_LED0 );
             pinValue_1 = PIN_getOutputValue( Board_LED1 );
@@ -538,7 +546,7 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
             pinValue_1 = !pinValue_1;
             PIN_setOutputValue( ledHandle, Board_LED1, pinValue_1 );
 
-            //Led vilkkuu noin sekunnin välein
+            //Led vilkkuu noin sekunnin vï¿½lein
             Task_sleep(1000000 / Clock_tickPeriod);
 
             if(clockTicks > gameEndTime) {
@@ -729,13 +737,13 @@ Int main(void) {
     }
 
     // Alustetaan kello
-    Clock_Params_init(&clkParams);
-    clkParams.period = 5000000 / Clock_tickPeriod;
-    clkParams.startFlag = FALSE;
+    Clock_Params_init(&clkmasaParams);
+    clkmasaParams.period = 5000000 / Clock_tickPeriod;
+    clkmasaParams.startFlag = FALSE;
 
     // Otetaan kello kï¿½yttï¿½ï¿½n ohjelmassa
-    clkHandle = Clock_create((Clock_FuncPtr)clkFxn, 5000000 / Clock_tickPeriod, &clkParams, NULL);
-    if (clkHandle == NULL) {
+    clkmasaHandle = Clock_create((Clock_FuncPtr)clkmasaFxn, 5000000 / Clock_tickPeriod, &clkmasaParams, NULL);
+    if (clkmasaHandle == NULL) {
       System_abort("Clock create failed");
     }
 
