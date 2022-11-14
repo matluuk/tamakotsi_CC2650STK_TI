@@ -27,6 +27,12 @@
 #include "sensors/opt3001.h"
 #include "sensors/mpu9250.h"
 
+//prototyypit funktioill
+void playMusic(PIN_Handle buzzerPin, int *note, int tempo);
+void sendData();
+void clearData(float*data, int size);
+int peakCount(float *data, int size, float treshold);
+
 /* Task */
 #define STACKSIZE 2048
 Char sensorTaskStack[STACKSIZE];
@@ -35,7 +41,7 @@ Char dataTaskStack[STACKSIZE];
 Char mainTaskStack[STACKSIZE];
 
 //Tilamuuttujat
-enum state { MENU=1, DATA_READY, UART_MSG_READY, MUSIC, SEND_DATA, MOVE_DETECTION, MOVE_DETECTION_DATA_READY, GAME};
+enum state { MENU=1, DATA_READY, UART_MSG_READY, MUSIC, SEND_DATA, MOVE_DETECTION, MOVE_DETECTION_DATA_READY, MOVE_DETECTION_ALGORITHM, GAME};
 enum stateMenu {MOVE, PLAY_GAME, PLAY_MUSIC};
 enum state programState = MENU;
 enum stateMenu menuState =  MOVE;
@@ -48,20 +54,24 @@ int *music;
 
 //Globaalit muutujat
 float ambientLight = -1000.0;
-float ax, ay, az, gx, gy, gz;
+float ax, ay, az, gx, gy, gz, time;
 char uartBuffer[10];
 
+//Data for move detection
 int dataIndex = 0;
-int dataSize = 110;
-float lightData[110];
-float axData[110];
-float ayData[110];
-float azData[110];
-float gxData[110];
-float gyData[110];
-float gzData[110];
-int timeData[110];
-double clockTicks = 0;
+int dataSize = 45;
+float lightData[45];
+float axData[45];
+float ayData[45];
+float azData[45];
+float gxData[45];
+float gyData[45];
+float gzData[45];
+float timeData[45];
+
+//time variables in (ticks).
+Uint32 clockTicks = 0;
+Uint32 mpuStartTicks = 0;
 
 //musiikkia
 int hedwigsTheme[] = {
@@ -91,11 +101,10 @@ int musicTest[] = {
 int gameEndMusic[] = {
                    415, 16, 400, 16, 380, 16 ,230, 32, 230, 32, 230,23, 190, 2, -1
 };
+int menu[] = {560, 16, 530, 16, 760, 16 ,870, 32, 230, 32, 340,23, 1000, 2, -1};
 
 
-//prototyypit funktioille
-void playMusic(PIN_Handle buzzerPin, int *note, int tempo);
-void sendData();
+
 
 // RTOS pin handles
 static PIN_Handle button0Handle;
@@ -162,11 +171,11 @@ static const I2CCC26XX_I2CPinCfg i2cMPUCfg = {
 
 
 
-
+/*This funktion is called when button 0 is pressed.
+ * MENU:
+ * select funktion.
+ */
 void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
-
-    // JTKJ: TehtÃ¤vÃ¤ 1. Vilkuta jompaa kumpaa lediÃ¤
-    // JTKJ: Exercise 1. Blink either led of the device
 
     System_printf("button0 pressed!\n");
     System_flush();
@@ -177,7 +186,9 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
                 programState = MUSIC;
                 nextState = MOVE_DETECTION;
                 music = choose;
-                Clock_start(clkmasaHandle);
+                mpuStartTicks = Clock_getTicks();
+                //Clock_start(clkmasaHandle);
+
                 break;
 
             case PLAY_GAME:
@@ -192,7 +203,7 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
 
             case PLAY_MUSIC:
                 programState = MUSIC;
-                music = hedwigsTheme;
+                music = gameEndMusic;
                 nextState = MENU;
                 break;
             default:
@@ -203,10 +214,10 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
         programState = MENU;
         System_printf("programState: MENU\n");
         System_flush();
-    } else if (programState == MOVE_DETECTION || programState == MOVE_DETECTION_DATA_READY){
+    } else if (programState == MOVE_DETECTION || programState == MOVE_DETECTION_DATA_READY || programState == MOVE_DETECTION_ALGORITHM){
         programState = MUSIC;
         nextState = MENU;
-        Clock_stop(clkmasaHandle);
+        //Clock_stop(clkmasaHandle);
         music = back;
         System_printf("MOVE_DETECTION stopped!\n");
         System_flush();
@@ -226,7 +237,11 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
     }
 }
 
-
+/*This funktion is called when button 1 is pressed.
+ * MENU:
+ * roll menu with this button.
+ *
+ */
 void button1Fxn(PIN_Handle handle, PIN_Id pinId) {
     System_printf("button1 pressed!\n");
     System_flush();
@@ -319,21 +334,8 @@ static void uartFxn(UART_Handle uart, void *rxBuf, size_t len) {
    UART_read(uart, rxBuf, 1);
 }
 
-// Kellokeskeytyksen kï¿½sittelijï¿½
-Void clkmasaFxn(UArg arg0) {
-    System_printf("clkmasaFxn\n");
-    if (programState == MOVE_DETECTION || programState == MOVE_DETECTION_DATA_READY){
-        programState = MUSIC;
-        nextState = SEND_DATA;
-        music = dataReady;
-        Clock_stop(clkmasaHandle);
-        System_printf("clkmasaFxn_state_change\n");
-    }
-    System_flush();
-}
-
 Void clkFxn(UArg arg0) {
-    //clockTicks = ???
+    clockTicks = Clock_getTicks(); //tallentaa ajan käynnistyksestä.
     if (programState == GAME) {
         //printf("clock test working\n");
         //System_flush();
@@ -493,18 +495,27 @@ Void sensorTaskFxn(UArg arg0, UArg arg1) {
 
         if (programState == MOVE_DETECTION){
             programState = MOVE_DETECTION_DATA_READY;
-
-
-
-            //MPU open i2c
-            i2cMPU = I2C_open(Board_I2C, &i2cMPUParams);
-            if (i2cMPU == NULL) {
-                System_abort("Error Initializing I2CMPU\n");
+            Uint32 ticks = Clock_getTicks();
+            if ((Clock_getTicks() - mpuStartTicks) * Clock_tickPeriod / 1000 < 2000 ){
+                //MPU open i2c
+                i2cMPU = I2C_open(Board_I2C, &i2cMPUParams);
+                if (i2cMPU == NULL) {
+                   System_abort("Error Initializing I2CMPU\n");
+                }
+                // MPU ask data
+                mpu9250_get_data(&i2cMPU, &ax, &ay, &az, &gx, &gy, &gz);
+                //time
+                time = ticks * Clock_tickPeriod / 1000;
+                //MPU close i2c
+                I2C_close(i2cMPU);
+            } else {
+                programState = MUSIC;
+                nextState = MOVE_DETECTION_ALGORITHM;
+                music = dataReady;
+                dataIndex = 0;
+                System_printf("Data ready for movement algorithm.\n");
+                System_flush();
             }
-            // MPU ask data
-            mpu9250_get_data(&i2cMPU, &ax, &ay, &az, &gx, &gy, &gz);
-            //MPU close i2c
-            I2C_close(i2cMPU);
         }
 
         // Just for sanity check for exercise, you can comment this out
@@ -530,8 +541,7 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
             playMusic(buzzerHandle, music, 144);
             programState = nextState;
             //System_printf("programState: nextState\n");
-        }
-        else if (programState == GAME) {
+        } else if (programState == GAME) {
             //System_printf("led changes/n");
             //System_flush();
             pinValue_0 = PIN_getOutputValue( Board_LED0 );
@@ -540,6 +550,24 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
             pinValue_1 = PIN_getOutputValue( Board_LED1 );
             pinValue_1 = !pinValue_1;
             PIN_setOutputValue( ledHandle, Board_LED1, pinValue_1 );
+        } else if (programState == MOVE_DETECTION_ALGORITHM){
+            int peaks = peakCount(axData, dataSize, 0.25);
+            char msg[30];
+            sprintf(msg, "peakCount = %d\n", peaks);
+            System_printf(msg);
+            System_flush();
+            clearData(timeData, dataSize);
+            clearData(axData, dataSize);
+            clearData(ayData, dataSize);
+            clearData(azData, dataSize);
+            clearData(gxData, dataSize);
+            clearData(gyData, dataSize);
+            clearData(gzData, dataSize);
+            System_printf("data cleared!");
+            System_flush();
+            programState = MUSIC;
+            nextState = MENU;
+            music = menu;
         }
         /*
         int i;
@@ -567,7 +595,7 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
             }
         }*/
         System_flush();
-        Task_sleep(500000 / Clock_tickPeriod);
+        Task_sleep(50000 / Clock_tickPeriod);
     }
 }
 
@@ -592,20 +620,21 @@ Void dataTaskFxn(UArg arg0, UArg arg1){
             gxData[dataIndex] = gx;
             gyData[dataIndex] = gy;
             gzData[dataIndex] = gz;
-            timeData[dataIndex] = Clock_getTicks()*Clock_tickPeriod/1000;//aika millisekunteina
+            timeData[dataIndex] = time;
             /*
             sprintf(merkkijono, "aika: %d\n", timeData[dataIndex]);
             System_printf(merkkijono);
             sprintf(merkkijono,"valoisuus: %.2f luxia\n",ambientLight);
             System_printf(merkkijono);
             */
-            sprintf(merkkijono, "ax: %.2f, ay: %.2f, az: %.2f, gx: %.2f, gy: %.2f, gz: %.2f\n", ax, ay, az, gx, gy, gz);
+            sprintf(merkkijono, "time: %.2f ax: %.2f, ay: %.2f, az: %.2f, gx: %.2f, gy: %.2f, gz: %.2f\n",time ,ax, ay, az, gx, gy, gz);
             System_printf(merkkijono);
             System_flush();
 
             dataIndex++;
             if (dataIndex == dataSize){
                 dataIndex = 0;
+
             }
         }
 
@@ -633,7 +662,7 @@ void sendData(){
         }
         */
 
-        sprintf(msgg, "%08d,%.4f,%05f,%05f,%05f,%05f,%05f\n",
+        sprintf(msgg, "%05f,%05f,%05f,%05f,%05f,%05f,%05f\n",
                 (timeData[index] - timeData[0]),
                 axData[index],
                 ayData[index],
@@ -661,7 +690,7 @@ void playMusic(PIN_Handle buzzerPin, int *note, int tempo){
     // iterate over the notes of the melody.
     // Remember, the array is twice the number of notes (notes + durations)
 
-    for (note; *note != -1; note = note + 2) {
+    for (note = note; *note != -1; note = note + 2) {
         if (programState == MUSIC) {
             // calculates the duration of each note
             divider = *(note + 1);
@@ -699,7 +728,31 @@ void playMusic(PIN_Handle buzzerPin, int *note, int tempo){
     }
 }
 
-Int main(void) {
+int peakCount(float *data, int size, float treshold){
+    int count = 0;
+    int peakCount = 0;
+    int i;
+    for (i = 0; i < size; i++ ){
+        if (data[i] > treshold) {
+            count++;
+        } else if (count){
+            peakCount++;
+            count = 0;
+        } else {
+            count = 0;
+        }
+    }
+    return peakCount;
+}
+
+void clearData(float *data, int size){
+    int i;
+    for (i = 0; i < size; i++){
+        data[i] = 0;
+    }
+}
+
+ Int main(void) {
 
     // Task variables
     Task_Handle sensorTaskHandle;
@@ -746,23 +799,11 @@ Int main(void) {
        System_abort("Error registering button1 callback function");
     }
 
-    // Alustetaan MASAkello
-    Clock_Params_init(&clkmasaParams);
-    clkmasaParams.period = 5000000 / Clock_tickPeriod;
-    clkmasaParams.startFlag = FALSE;
-
-    // Otetaan MASAkello kï¿½yttï¿½ï¿½n ohjelmassa
-    clkmasaHandle = Clock_create((Clock_FuncPtr)clkmasaFxn, 5000000 / Clock_tickPeriod, &clkmasaParams, NULL);
-    if (clkmasaHandle == NULL) {
-      System_abort("Clock create failed");
-    }
-
-    // Alustetaan kello
+    // Initialize clock
     Clock_Params_init(&clkParams);
     clkParams.period = 50000 / Clock_tickPeriod;
     clkParams.startFlag = TRUE;
 
-    // Otetaan kello kï¿½yttï¿½ï¿½n ohjelmassa
     clkHandle = Clock_create((Clock_FuncPtr)clkFxn, 50000 / Clock_tickPeriod, &clkParams, NULL);
     if (clkHandle == NULL) {
       System_abort("Clock create failed");
