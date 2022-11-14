@@ -61,7 +61,7 @@ float gxData[110];
 float gyData[110];
 float gzData[110];
 int timeData[110];
-int clockTicks = 0;
+double clockTicks = 0;
 
 //musiikkia
 int hedwigsTheme[] = {
@@ -182,6 +182,8 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
 
             case PLAY_GAME:
                 //led-game;
+                PIN_setOutputValue( ledHandle, Board_LED0, 1 );
+                PIN_setOutputValue( ledHandle, Board_LED1, 0 );
                 programState = MUSIC;
                 nextState = GAME;
                 System_printf("Paina b1, kun vihre� led syttyy.\nPaina b0, kun punainen led syttyy.\n");
@@ -216,7 +218,7 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
             System_printf("Nice!\n-\n");
         }
         else {
-            nextState = MENU;
+            programState = MENU;
             music = gameEndMusic;
             System_printf("Lose\n");
         }
@@ -276,9 +278,9 @@ void button1Fxn(PIN_Handle handle, PIN_Id pinId) {
             System_printf("Sait pisteen!\n");
         }
         else {
-            nextState = MENU;
+            programState = MENU;
             music = gameEndMusic;
-            System_printf("GAME stopped!\n");
+            System_printf("Lose!\n");
         }
         System_flush();
     }
@@ -331,9 +333,11 @@ Void clkmasaFxn(UArg arg0) {
 }
 
 Void clkFxn(UArg arg0) {
-    System_printf("clkFxn\n");
-    //t�h�n koodia
-    System_flush();
+    //clockTicks = ???
+    if (programState == GAME) {
+        //printf("clock test working\n");
+        //System_flush();
+        }
 }
 
 /* Task Functions */
@@ -520,44 +524,50 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
     while (1){
 
         //soittaa musiikkia
-        if(programState == MUSIC){
-            System_printf("Playing music.\n");
-            System_flush();
+        if(programState == MUSIC) {
+            //System_printf("Playing music.\n");
+            //System_flush();
             playMusic(buzzerHandle, music, 144);
             programState = nextState;
-            System_printf("programState: nextState\n");
-            System_flush();
+            //System_printf("programState: nextState\n");
         }
         else if (programState == GAME) {
-            //int ledBlinkTime = 0
-            PIN_setOutputValue( ledHandle, Board_LED0, 1 );
-            PIN_setOutputValue( ledHandle, Board_LED1, 0 );
-            int gameEndTime = 0;
-            gameEndTime = clockTicks + 15000000;
-
-            //ledBlinkTime = clockTicks + 1000000;
-            //LED0 = punainen, LED1 = vihre�
-
+            //System_printf("led changes/n");
+            //System_flush();
             pinValue_0 = PIN_getOutputValue( Board_LED0 );
-            pinValue_1 = PIN_getOutputValue( Board_LED1 );
-
             pinValue_0 = !pinValue_0;
             PIN_setOutputValue( ledHandle, Board_LED0, pinValue_0 );
+            pinValue_1 = PIN_getOutputValue( Board_LED1 );
             pinValue_1 = !pinValue_1;
             PIN_setOutputValue( ledHandle, Board_LED1, pinValue_1 );
+        }
+        /*
+        int i;
+        int ledBlinkTime = clockTicks + 100000 / Clock_tickPeriod;
+        int gameEndTime = clockTicks + 1000000 / Clock_tickPeriod;
 
-            //Led vilkkuu noin sekunnin v�lein
-            Task_sleep(1000000 / Clock_tickPeriod);
+        PIN_setOutputValue( ledHandle, Board_LED0, 1 );
+        PIN_setOutputValue( ledHandle, Board_LED1, 0 );
 
-            if(clockTicks > gameEndTime) {
+        for (i=0; i<=10; i++) {
+            if (clockTicks >= ledBlinkTime) {
+                pinValue_0 = PIN_getOutputValue( Board_LED0 );
+                pinValue_1 = PIN_getOutputValue( Board_LED1 );
+                pinValue_0 = !pinValue_0;
+                PIN_setOutputValue( ledHandle, Board_LED0, pinValue_0 );
+                pinValue_1 = !pinValue_1;
+                PIN_setOutputValue( ledHandle, Board_LED1, pinValue_1 );
+                ledBlinkTime = ledBlinkTime + 100000 / Clock_tickPeriod;
+            }
+            if (clockTicks > gameEndTime) {
                 programState = MUSIC;
                 music = gameEndMusic;
                 programState = MENU;
-                System_printf("Lose!\n");
-                }
-        }
+                System_printf("Time ran out!\n");
+            }
+        }*/
         System_flush();
-        Task_sleep(50000 / Clock_tickPeriod);
+        Task_sleep(500000 / Clock_tickPeriod);
     }
 }
 
@@ -736,14 +746,25 @@ Int main(void) {
        System_abort("Error registering button1 callback function");
     }
 
-    // Alustetaan kello
+    // Alustetaan MASAkello
     Clock_Params_init(&clkmasaParams);
     clkmasaParams.period = 5000000 / Clock_tickPeriod;
     clkmasaParams.startFlag = FALSE;
 
-    // Otetaan kello k�ytt��n ohjelmassa
+    // Otetaan MASAkello k�ytt��n ohjelmassa
     clkmasaHandle = Clock_create((Clock_FuncPtr)clkmasaFxn, 5000000 / Clock_tickPeriod, &clkmasaParams, NULL);
     if (clkmasaHandle == NULL) {
+      System_abort("Clock create failed");
+    }
+
+    // Alustetaan kello
+    Clock_Params_init(&clkParams);
+    clkParams.period = 50000 / Clock_tickPeriod;
+    clkParams.startFlag = TRUE;
+
+    // Otetaan kello k�ytt��n ohjelmassa
+    clkHandle = Clock_create((Clock_FuncPtr)clkFxn, 50000 / Clock_tickPeriod, &clkParams, NULL);
+    if (clkHandle == NULL) {
       System_abort("Clock create failed");
     }
 
