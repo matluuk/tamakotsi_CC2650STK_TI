@@ -2,8 +2,6 @@
 #include <stdio.h>
 #include <inttypes.h>
 
-/* testi kommenttia*/
-
 /* XDCtools files */
 #include <xdc/std.h>
 #include <xdc/runtime/System.h>
@@ -27,11 +25,9 @@
 #include "sensors/opt3001.h"
 #include "sensors/mpu9250.h"
 
-//prototyypit funktioill
-void playMusic(PIN_Handle buzzerPin, int *note, int tempo);
-void sendData();
-void clearData(float*data, int size);
-int peakCount(float *data, int size, float treshold);
+/* Own libraries*/
+#include "music.h"
+#include "funktions.h"
 
 /* Task */
 #define STACKSIZE 2048
@@ -73,35 +69,7 @@ float timeData[45];
 Uint32 clockTicks = 0;
 Uint32 mpuStartTicks = 0;
 
-//musiikkia
-int hedwigsTheme[] = {
-    // Hedwig's theme from the Harry Potter Movies
-    // Score from https://musescore.com/user/3811306/scores/4906610
-                      0,2,294,4,392,-4,466,8,440,4,392,2,587,4,523,-2,440,-2,392,-4,466,8,440,4,349,2,415,4,294,-1,294,4,392,-4,466,8,440,4,392,2,587,4,698,2,659,4,622,2,494,4,622,-4,587,8,554,4,277,2,494,4,392,-1,466,4,587,2,466,4,587,2,466,4,622,2,587,4,554,2,440,4,466,-4,587,8,554,4,277,2,294,4,587,-1,0,4,466,4,587,2,466,4,587,2,466,4,698,2,659,4,622,2,494,4,622,-4,587,8,554,4,277,2,466,4,392,-1,-1
-};
-//testi ��ni
-int dataReady[] = {
-                   440, 4, 550, 8, 660, 16, 660, 16, 440, 4, 440, 4, -1
-};
-int back[] = {
-              400, 2, 200, 4, 300, 4, -1
-};
-int choose[] = {
-                300, 16, 400, 16, -1
-};
-int move[] = {
-              340, 16, 400, 16,300, 16, 400, 16, -1
-};
-int game[] = {
-                170, 8, 300, 16, 300, 8, 500, 16, -1
-};
-int musicTest[] = {
-                89, 16, 210, 16, -1
-};
-int gameEndMusic[] = {
-                   415, 16, 400, 16, 380, 16 ,230, 32, 230, 32, 230,23, 190, 2, -1
-};
-int menu[] = {560, 16, 530, 16, 760, 16 ,870, 32, 230, 32, 340,23, 1000, 2, -1};
+
 
 
 
@@ -117,7 +85,7 @@ static PIN_Handle buzzerHandle;
 static PIN_State buzzerState;
 // RTOS-muuttujat MPU9250-pinneille
 static PIN_Handle mpuHandle;
-static PIN_State mpuState;
+//static PIN_State mpuState;
 
 // RTOS:n kellomuuttujat
 Clock_Handle clkmasaHandle;
@@ -328,7 +296,7 @@ static void uartFxn(UART_Handle uart, void *rxBuf, size_t len) {
    System_printf(msg);
    sprintf(msg2, "rxBuf: %x, len %d", rxBuf, len);
    System_printf(msg2);
-   System_flush;
+   System_flush();
 
    // K�sittelij�n viimeisen� asiana siirryt��n odottamaan uutta keskeytyst�..
    UART_read(uart, rxBuf, 1);
@@ -412,8 +380,6 @@ Void sensorTaskFxn(UArg arg0, UArg arg1) {
     I2C_Params      i2cParams;
     I2C_Handle i2cMPU; // Own i2c-interface for MPU9250 sensor
     I2C_Params i2cMPUParams;
-    double valoisuus;
-    char merkkijono[32];
 
     //Configure i2cMPU
     I2C_Params_init(&i2cMPUParams);
@@ -526,6 +492,8 @@ Void sensorTaskFxn(UArg arg0, UArg arg1) {
         Task_sleep(50000 / Clock_tickPeriod);
     }
 }
+
+
 
 Void mainTaskFxn(UArg arg0, UArg arg1) {
     //vihre� led palaa aluksi
@@ -714,7 +682,7 @@ void playMusic(PIN_Handle buzzerPin, int *note, int tempo){
             System_flush();
             */
 
-            // stop the waveform generation before the next note.
+            // stop buzzer before the next note.
             buzzerClose();
 
             // Wait for the specified duration before playing the next note.
@@ -728,29 +696,7 @@ void playMusic(PIN_Handle buzzerPin, int *note, int tempo){
     }
 }
 
-int peakCount(float *data, int size, float treshold){
-    int count = 0;
-    int peakCount = 0;
-    int i;
-    for (i = 0; i < size; i++ ){
-        if (data[i] > treshold) {
-            count++;
-        } else if (count){
-            peakCount++;
-            count = 0;
-        } else {
-            count = 0;
-        }
-    }
-    return peakCount;
-}
 
-void clearData(float *data, int size){
-    int i;
-    for (i = 0; i < size; i++){
-        data[i] = 0;
-    }
-}
 
  Int main(void) {
 
