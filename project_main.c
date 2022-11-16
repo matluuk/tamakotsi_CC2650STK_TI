@@ -524,12 +524,6 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
                 PIN_setOutputValue( ledHandle, Board_LED1, pinValue_1 );
                 timeFactor = timeFactor + 100;
             }
-            else if (clockTicks > gameEndTime) {
-                 programState = MUSIC;
-                 music = gameEndMusic;
-                 programState = MENU;
-                 System_printf("Time ran out!\n");
-            }
         } else if (programState == MOVE_DETECTION_ALGORITHM){
             int peaks = peakCount(axData, dataSize, 0.25);
             char msg[30];
