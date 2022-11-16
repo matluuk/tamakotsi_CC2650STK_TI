@@ -11,16 +11,8 @@
 #define FUNKTIONS_H_
 
 //prototypes for funktions.
-/*
- * Play music
- */
-void playMusic(PIN_Handle buzzerPin, int *note, int tempo);
-/*
- * send data to debug console.
- */
-void sendData();
 void clearData(float*data, int size);
-int peakCount(float *data, int size, float treshold);
+int peakCount(float *time, float *data, int dataSize, float treshold, float peakTime);
 
 
 

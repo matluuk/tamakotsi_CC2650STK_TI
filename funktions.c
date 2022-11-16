@@ -5,16 +5,17 @@
  *      Author: matti
  */
 
-
-int peakCount(float *data, int size, float treshold){
+int peakCount(float *time, float *data, int dataSize, float treshold, float peakTime){
     int count = 0;
     int peakCount = 0;
     int i;
-    for (i = 0; i < size; i++ ){
+    for (i = 0; i < dataSize; i++ ){
         if (data[i] > treshold) {
             count++;
         } else if (count){
-            peakCount++;
+            if((time[i] - time[i - count]) >= peakTime){
+                peakCount++;
+            }
             count = 0;
         } else {
             count = 0;
