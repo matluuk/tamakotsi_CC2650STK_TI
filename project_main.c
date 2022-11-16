@@ -155,7 +155,6 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
                 nextState = MOVE_DETECTION;
                 music = choose;
                 mpuStartTicks = Clock_getTicks();
-                //Clock_start(clkmasaHandle);
 
                 break;
 
@@ -519,7 +518,7 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
             pinValue_1 = !pinValue_1;
             PIN_setOutputValue( ledHandle, Board_LED1, pinValue_1 );
         } else if (programState == MOVE_DETECTION_ALGORITHM){
-            int peaks = peakCount(axData, dataSize, 0.25);
+            int peaks = peakCount(timeData, axData, dataSize, 0.25, 0);
             char msg[30];
             sprintf(msg, "peakCount = %d\n", peaks);
             System_printf(msg);
@@ -747,7 +746,7 @@ void playMusic(PIN_Handle buzzerPin, int *note, int tempo){
 
     // Initialize clock
     Clock_Params_init(&clkParams);
-    clkParams.period = 50000 / Clock_tickPeriod;
+    clkParams.period = 50000 / Clock_tickPeriod; //50ms
     clkParams.startFlag = TRUE;
 
     clkHandle = Clock_create((Clock_FuncPtr)clkFxn, 50000 / Clock_tickPeriod, &clkParams, NULL);
