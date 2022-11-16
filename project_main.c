@@ -71,9 +71,6 @@ Uint32 mpuStartTicks = 0;
 Uint32 gameStartTicks = 0;
 
 
-
-
-
 // RTOS pin handles
 static PIN_Handle button0Handle;
 static PIN_State button0State;
@@ -153,9 +150,8 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
             case MOVE:
                 programState = MUSIC;
                 nextState = MOVE_DETECTION;
-                music = choose;
-                mpuStartTicks = Clock_getTicks();
-
+                music = chooseMusic;
+                mpuStartTicks = clockTicks;
                 break;
 
             case PLAY_GAME:
@@ -164,14 +160,14 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
                 PIN_setOutputValue( ledHandle, Board_LED1, 0 );
                 programState = MUSIC;
                 nextState = GAME;
-                System_printf("Paina b1, kun vihre� led syttyy.\nPaina b0, kun punainen led syttyy.\n");
-                music = choose;
-                gameStartTicks = Clock_getTicks();
+                System_printf("Push button0 when red led is on.\nPush button1 when green led is on.\n");
+                music = chooseMusic;
+                gameStartTicks = clockTicks;
                 break;
 
             case PLAY_MUSIC:
                 programState = MUSIC;
-                music = gameEndMusic;
+                music = hedwigsThemeMusic;
                 nextState = MENU;
                 break;
             default:
@@ -186,20 +182,22 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
         programState = MUSIC;
         nextState = MENU;
         //Clock_stop(clkmasaHandle);
-        music = back;
+        music = backMusic;
         System_printf("MOVE_DETECTION stopped!\n");
         System_flush();
     } else if (programState == GAME) {
         if (pinValue_0 == 1) {
+            char msg[30];
             programState = MUSIC;
             nextState = GAME;
-            music = musicTest;
-            System_printf("Nice!\n-\n");
+            music = gamePointMusic;
+            sprintf(msg, "You get a point! pinValue_0 : %d\n", pinValue_0);
+            System_printf(msg);
         }
         else {
             programState = MENU;
             music = gameEndMusic;
-            System_printf("Lose\n");
+            System_printf("Wrong button!\n");
         }
         System_flush();
     }
@@ -210,6 +208,7 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
  * roll menu with this button.
  *
  */
+
 void button1Fxn(PIN_Handle handle, PIN_Id pinId) {
     System_printf("button1 pressed!\n");
     System_flush();
@@ -223,7 +222,7 @@ void button1Fxn(PIN_Handle handle, PIN_Id pinId) {
                 PIN_setOutputValue( ledHandle, Board_LED1, 1 );
                 programState = MUSIC;
                 nextState = MENU;
-                music = game;
+                music = gameMusic;
                 menuState = PLAY_GAME;
                 break;
 
@@ -234,7 +233,7 @@ void button1Fxn(PIN_Handle handle, PIN_Id pinId) {
                 PIN_setOutputValue( ledHandle, Board_LED1, 0 );
                 programState = MUSIC;
                 nextState = MENU;
-                music = musicTest;
+                music = listenMusic;
                 menuState = PLAY_MUSIC;
                 break;
 
@@ -245,7 +244,7 @@ void button1Fxn(PIN_Handle handle, PIN_Id pinId) {
                 PIN_setOutputValue( ledHandle, Board_LED1, 1 );
                 programState = MUSIC;
                 nextState = MENU;
-                music = move;
+                music = moveMusic;
                 menuState = MOVE;
                 break;
             default:
@@ -253,17 +252,18 @@ void button1Fxn(PIN_Handle handle, PIN_Id pinId) {
         }
         System_flush();
     } else if (programState == GAME) {
-        programState = MUSIC;
-        nextState = GAME;
-        music = musicTest;
         if (pinValue_1 == 1) {
-            //saa pisteen
-            System_printf("Sait pisteen!\n");
+            char msg[30];
+            programState = MUSIC;
+            nextState = GAME;
+            music = gamePointMusic;
+            sprintf(msg, "You get a point! pinValue_0 : %d\n", pinValue_1);
+            System_printf(msg);
         }
         else {
             programState = MENU;
             music = gameEndMusic;
-            System_printf("Lose!\n");
+            System_printf("Wrong button!\n");
         }
         System_flush();
     }
@@ -476,7 +476,7 @@ Void sensorTaskFxn(UArg arg0, UArg arg1) {
             } else {
                 programState = MUSIC;
                 nextState = MOVE_DETECTION_ALGORITHM;
-                music = dataReady;
+                music = dataReadyMusic;
                 dataIndex = 0;
                 System_printf("Data ready for movement algorithm.\n");
                 System_flush();
@@ -498,7 +498,7 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
     //vihre� led palaa aluksi
     System_printf("b0: Move your tamagotchi\nb1: next state\n---\n");
     PIN_setOutputValue( ledHandle, Board_LED0, 1 );
-    int timeFactor = 1;
+    int blinkAccelator = 1;
 
 
 
@@ -512,7 +512,7 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
             programState = nextState;
             //System_printf("programState: nextState\n");
         } else if (programState == GAME) {
-            if ((clockTicks - gameStartTicks) * Clock_tickPeriod / 1000 < 2000 - (2000 * timeFactor)) {
+            if ((clockTicks - gameStartTicks) * Clock_tickPeriod / 1000 > 2000 - blinkAccelator) {
                 //System_printf("led changes/n");
                 //System_flush();
                 pinValue_0 = PIN_getOutputValue( Board_LED0 );
@@ -521,7 +521,10 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
                 pinValue_1 = PIN_getOutputValue( Board_LED1 );
                 pinValue_1 = !pinValue_1;
                 PIN_setOutputValue( ledHandle, Board_LED1, pinValue_1 );
-                timeFactor = timeFactor + 100;
+                if (blinkAccelator < 1800) {
+                    blinkAccelator = blinkAccelator + 100;
+                }
+                gameStartTicks = clockTicks;
             }
         } else if (programState == MOVE_DETECTION_ALGORITHM){
             int peaks = peakCount(timeData, axData, dataSize, 0.25, 0);
@@ -540,7 +543,7 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
             System_flush();
             programState = MUSIC;
             nextState = MENU;
-            music = menu;
+            music = menuMusic;
         }
 
         System_flush();
@@ -556,7 +559,7 @@ Void dataTaskFxn(UArg arg0, UArg arg1){
         if(programState == SEND_DATA){
             programState = MUSIC;
             nextState = MENU;
-            music = back;
+            music = backMusic;
             sendData();
             System_printf("data sent.");
         } else if(programState == MOVE_DETECTION_DATA_READY)
@@ -639,7 +642,7 @@ void playMusic(PIN_Handle buzzerPin, int *note, int tempo){
     // iterate over the notes of the melody.
     // Remember, the array is twice the number of notes (notes + durations)
 
-    for (note = note; *note != -1; note = note + 2) {
+    for (note; *note != -1; note = note + 2) {
         if (programState == MUSIC) {
             // calculates the duration of each note
             divider = *(note + 1);
