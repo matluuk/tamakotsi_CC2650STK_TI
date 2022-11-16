@@ -68,7 +68,7 @@ float timeData[45];
 //time variables in (ticks).
 Uint32 clockTicks = 0;
 Uint32 mpuStartTicks = 0;
-
+Uint32 gameStartTicks = 0;
 
 
 
@@ -167,6 +167,7 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
                 nextState = GAME;
                 System_printf("Paina b1, kun vihre� led syttyy.\nPaina b0, kun punainen led syttyy.\n");
                 music = choose;
+                gameStartTicks = Clock_getTicks();
                 break;
 
             case PLAY_MUSIC:
@@ -461,8 +462,7 @@ Void sensorTaskFxn(UArg arg0, UArg arg1) {
 
         if (programState == MOVE_DETECTION){
             programState = MOVE_DETECTION_DATA_READY;
-            Uint32 ticks = Clock_getTicks();
-            if ((Clock_getTicks() - mpuStartTicks) * Clock_tickPeriod / 1000 < 2000 ){
+            if ((clockTicks - mpuStartTicks) * Clock_tickPeriod / 1000 < 2000 ){
                 //MPU open i2c
                 i2cMPU = I2C_open(Board_I2C, &i2cMPUParams);
                 if (i2cMPU == NULL) {
@@ -471,7 +471,7 @@ Void sensorTaskFxn(UArg arg0, UArg arg1) {
                 // MPU ask data
                 mpu9250_get_data(&i2cMPU, &ax, &ay, &az, &gx, &gy, &gz);
                 //time
-                time = ticks * Clock_tickPeriod / 1000;
+                time = clockTicks * Clock_tickPeriod / 1000;
                 //MPU close i2c
                 I2C_close(i2cMPU);
             } else {
@@ -499,6 +499,9 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
     //vihre� led palaa aluksi
     System_printf("b0: Move your tamagotchi\nb1: next state\n---\n");
     PIN_setOutputValue( ledHandle, Board_LED0, 1 );
+    int timeFactor = 1;
+
+
 
     while (1){
 
@@ -510,14 +513,23 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
             programState = nextState;
             //System_printf("programState: nextState\n");
         } else if (programState == GAME) {
-            //System_printf("led changes/n");
-            //System_flush();
-            pinValue_0 = PIN_getOutputValue( Board_LED0 );
-            pinValue_0 = !pinValue_0;
-            PIN_setOutputValue( ledHandle, Board_LED0, pinValue_0 );
-            pinValue_1 = PIN_getOutputValue( Board_LED1 );
-            pinValue_1 = !pinValue_1;
-            PIN_setOutputValue( ledHandle, Board_LED1, pinValue_1 );
+            if ((clockTicks - gameStartTicks) * Clock_tickPeriod / 1000 < 2000 - (2000 * timeFactor)) {
+                //System_printf("led changes/n");
+                //System_flush();
+                pinValue_0 = PIN_getOutputValue( Board_LED0 );
+                pinValue_0 = !pinValue_0;
+                PIN_setOutputValue( ledHandle, Board_LED0, pinValue_0 );
+                pinValue_1 = PIN_getOutputValue( Board_LED1 );
+                pinValue_1 = !pinValue_1;
+                PIN_setOutputValue( ledHandle, Board_LED1, pinValue_1 );
+                timeFactor = timeFactor + 100;
+            }
+            else if (clockTicks > gameEndTime) {
+                 programState = MUSIC;
+                 music = gameEndMusic;
+                 programState = MENU;
+                 System_printf("Time ran out!\n");
+            }
         } else if (programState == MOVE_DETECTION_ALGORITHM){
             int peaks = peakCount(axData, dataSize, 0.25);
             char msg[30];
@@ -537,31 +549,7 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
             nextState = MENU;
             music = menu;
         }
-        /*
-        int i;
-        int ledBlinkTime = clockTicks + 100000 / Clock_tickPeriod;
-        int gameEndTime = clockTicks + 1000000 / Clock_tickPeriod;
 
-        PIN_setOutputValue( ledHandle, Board_LED0, 1 );
-        PIN_setOutputValue( ledHandle, Board_LED1, 0 );
-
-        for (i=0; i<=10; i++) {
-            if (clockTicks >= ledBlinkTime) {
-                pinValue_0 = PIN_getOutputValue( Board_LED0 );
-                pinValue_1 = PIN_getOutputValue( Board_LED1 );
-                pinValue_0 = !pinValue_0;
-                PIN_setOutputValue( ledHandle, Board_LED0, pinValue_0 );
-                pinValue_1 = !pinValue_1;
-                PIN_setOutputValue( ledHandle, Board_LED1, pinValue_1 );
-                ledBlinkTime = ledBlinkTime + 100000 / Clock_tickPeriod;
-            }
-            if (clockTicks > gameEndTime) {
-                programState = MUSIC;
-                music = gameEndMusic;
-                programState = MENU;
-                System_printf("Time ran out!\n");
-            }
-        }*/
         System_flush();
         Task_sleep(50000 / Clock_tickPeriod);
     }
