@@ -12,7 +12,9 @@
 
 //prototypes for funktions.
 void clearData(float*data, int size);
-int peakCount(float *time, float *data, int dataSize, float treshold, float peakTime);
+int peakCount(float *time, float *data, float dataSize, float treshold, int direction, float peakTime);
+
+int peakCountMargin(float *time, float *ax, float *ay, float *az, int dataSize, char peakAxis, float treshold, float errorMargin, float peakTime);
 
 
 

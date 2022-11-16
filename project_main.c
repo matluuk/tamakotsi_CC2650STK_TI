@@ -29,6 +29,11 @@
 #include "music.h"
 #include "funktions.h"
 
+/* Prototypes */
+void sendData();
+void playMusic(PIN_Handle buzzerPin, int *note, int tempo);
+void clearAllData();
+
 /* Task */
 #define STACKSIZE 2048
 Char sensorTaskStack[STACKSIZE];
@@ -54,16 +59,16 @@ float ax, ay, az, gx, gy, gz, time;
 char uartBuffer[10];
 
 //Data for move detection
-int dataIndex = 0;
-int dataSize = 45;
-float lightData[45];
-float axData[45];
-float ayData[45];
-float azData[45];
-float gxData[45];
-float gyData[45];
-float gzData[45];
-float timeData[45];
+int dataIndex;
+int dataSize = 85;
+float lightData[85];
+float axData[85];
+float ayData[85];
+float azData[85];
+float gxData[85];
+float gyData[85];
+float gzData[85];
+float timeData[85];
 
 //time variables in (ticks).
 Uint32 clockTicks = 0;
@@ -380,6 +385,7 @@ Void sensorTaskFxn(UArg arg0, UArg arg1) {
     I2C_Params      i2cParams;
     I2C_Handle i2cMPU; // Own i2c-interface for MPU9250 sensor
     I2C_Params i2cMPUParams;
+    char msg[30];
 
     //Configure i2cMPU
     I2C_Params_init(&i2cMPUParams);
@@ -461,7 +467,7 @@ Void sensorTaskFxn(UArg arg0, UArg arg1) {
 
         if (programState == MOVE_DETECTION){
             programState = MOVE_DETECTION_DATA_READY;
-            if ((clockTicks - mpuStartTicks) * Clock_tickPeriod / 1000 < 2000 ){
+            if ((clockTicks - mpuStartTicks) * Clock_tickPeriod < 4000000 ){
                 //MPU open i2c
                 i2cMPU = I2C_open(Board_I2C, &i2cMPUParams);
                 if (i2cMPU == NULL) {
@@ -470,9 +476,29 @@ Void sensorTaskFxn(UArg arg0, UArg arg1) {
                 // MPU ask data
                 mpu9250_get_data(&i2cMPU, &ax, &ay, &az, &gx, &gy, &gz);
                 //time
-                time = clockTicks * Clock_tickPeriod / 1000;
+                time = Clock_getTicks() * Clock_tickPeriod / 1000;
                 //MPU close i2c
                 I2C_close(i2cMPU);
+
+                /*
+                //Testing data reading
+                sprintf(msg, "dataIndex: %.d \n",dataIndex);
+                System_printf(msg);
+                sprintf(msg, "time: %.2f ax: %.2f, ay: %.2f, az: %.2f, gx: %.2f, gy: %.2f, gz: %.2f\n",time ,ax, ay, az, gx, gy, gz);
+                System_printf(msg);
+                System_flush();
+                */
+
+                //saving data to lists
+                timeData[dataIndex] = time;
+                axData[dataIndex] = ax;
+                ayData[dataIndex] = ay;
+                azData[dataIndex] = az;
+                gxData[dataIndex] = gx;
+                gyData[dataIndex] = gy;
+                gzData[dataIndex] = gz;
+                dataIndex++;
+
             } else {
                 programState = MUSIC;
                 nextState = MOVE_DETECTION_ALGORITHM;
@@ -524,22 +550,19 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
                 timeFactor = timeFactor + 100;
             }
         } else if (programState == MOVE_DETECTION_ALGORITHM){
-            int peaks = peakCount(timeData, axData, dataSize, 0.25, 0);
+            int peaks = peakCount(timeData, axData, dataSize, 0.25, 1, 0);
             char msg[30];
-            sprintf(msg, "peakCount = %d\n", peaks);
+            sprintf(msg, "peakCount without error margin = %d\n", peaks);
+            System_printf(msg);
+            peaks = peakCountMargin(&time, &ax, &ay, &az, dataSize, 'x', 0.25, 0.1, 0);
+            sprintf(msg, "peakCount with error margin = %d\n", peaks);
             System_printf(msg);
             System_flush();
-            clearData(timeData, dataSize);
-            clearData(axData, dataSize);
-            clearData(ayData, dataSize);
-            clearData(azData, dataSize);
-            clearData(gxData, dataSize);
-            clearData(gyData, dataSize);
-            clearData(gzData, dataSize);
-            System_printf("data cleared!");
-            System_flush();
+
+            //clearAllData();
+
             programState = MUSIC;
-            nextState = MENU;
+            nextState = SEND_DATA;
             music = menu;
         }
 
@@ -550,6 +573,7 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
 
 Void dataTaskFxn(UArg arg0, UArg arg1){
     char merkkijono[10];
+    dataIndex = 0;
 
     while (1){
 
@@ -562,29 +586,36 @@ Void dataTaskFxn(UArg arg0, UArg arg1){
         } else if(programState == MOVE_DETECTION_DATA_READY)
         {
             programState = MOVE_DETECTION;
-            lightData[dataIndex] = ambientLight;
+            //save data to lists
+            /*
+            timeData[dataIndex] = time - timeData[0];
             axData[dataIndex] = ax;
             ayData[dataIndex] = ay;
             azData[dataIndex] = az;
             gxData[dataIndex] = gx;
             gyData[dataIndex] = gy;
             gzData[dataIndex] = gz;
-            timeData[dataIndex] = time;
+            */
             /*
             sprintf(merkkijono, "aika: %d\n", timeData[dataIndex]);
             System_printf(merkkijono);
             sprintf(merkkijono,"valoisuus: %.2f luxia\n",ambientLight);
             System_printf(merkkijono);
             */
+            /*
+            sprintf(merkkijono, "dataIndex: %.d \n",dataIndex);
+            System_printf(merkkijono);
             sprintf(merkkijono, "time: %.2f ax: %.2f, ay: %.2f, az: %.2f, gx: %.2f, gy: %.2f, gz: %.2f\n",time ,ax, ay, az, gx, gy, gz);
             System_printf(merkkijono);
             System_flush();
+            */
 
+            /*
             dataIndex++;
             if (dataIndex == dataSize){
                 dataIndex = 0;
-
             }
+            */
         }
 
         //System_printf("dataTask\n");
@@ -599,11 +630,9 @@ void sendData(){
     //sends data
     char msgg[30];
     int i;
-    int index;
     sprintf(msgg, "[time, ax, ay, az, gx, gy, gz]\n");
     System_printf(msgg);
     for(i = 0; i < dataSize; i++){
-        index = i;
         /*
         index = dataIndex + i;
         if (index >= dataSize){
@@ -612,16 +641,17 @@ void sendData(){
         */
 
         sprintf(msgg, "%05f,%05f,%05f,%05f,%05f,%05f,%05f\n",
-                (timeData[index] - timeData[0]),
-                axData[index],
-                ayData[index],
-                azData[index],
-                gxData[index],
-                gyData[index],
-                gzData[index]);
+                timeData[i] - timeData[0],
+                axData[i],
+                ayData[i],
+                azData[i],
+                gxData[i],
+                gyData[i],
+                gzData[i]);
         System_printf(msgg);
         System_flush();
     }
+    clearAllData();
 }
 
 void playMusic(PIN_Handle buzzerPin, int *note, int tempo){
@@ -677,6 +707,17 @@ void playMusic(PIN_Handle buzzerPin, int *note, int tempo){
     }
 }
 
+void clearAllData(){
+    clearData(axData, dataSize);
+    clearData(ayData, dataSize);
+    clearData(azData, dataSize);
+    clearData(gxData, dataSize);
+    clearData(gyData, dataSize);
+    clearData(gzData, dataSize);
+    clearData(timeData, dataSize);
+    System_printf("All data cleared!\n");
+    System_flush();
+}
 
 
  Int main(void) {
