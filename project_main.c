@@ -37,14 +37,16 @@ void clearAllData();
 /* Task */
 #define STACKSIZE 2048
 Char sensorTaskStack[STACKSIZE];
-//Char uartTaskStack[STACKSIZE];
+Char uartTaskStack[STACKSIZE];
 Char dataTaskStack[STACKSIZE];
 Char mainTaskStack[STACKSIZE];
 
 //Tilamuuttujat
-enum state { MENU=1, DATA_READY, UART_MSG_READY, MUSIC, SEND_DATA, MOVE_DETECTION, MOVE_DETECTION_DATA_READY, MOVE_DETECTION_ALGORITHM, GAME};
+enum state { MENU=1, DATA_READY, MUSIC, SEND_DATA, MOVE_DETECTION, MOVE_DETECTION_DATA_READY, MOVE_DETECTION_ALGORITHM, GAME};
+enum stateUart {WAITING=1, MSG_RECEIVED, SEND_MSG};
 enum stateMenu {MOVE, PLAY_GAME, PLAY_MUSIC};
 enum state programState = MENU;
+enum stateUart uartState = WAITING;
 enum stateMenu menuState =  MOVE;
 //seuraava tilamuutos
 enum state nextState;
@@ -56,7 +58,9 @@ int *music;
 //Globaalit muutujat
 float ambientLight = -1000.0;
 float ax, ay, az, gx, gy, gz, time;
-char uartBuffer[10];
+int uartBufferSize = 1;
+char uartBuffer[1];
+char uartMsg[80];
 
 //Data for move detection
 int dataIndex;
@@ -157,6 +161,8 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
                 nextState = MOVE_DETECTION;
                 music = chooseMusic;
                 mpuStartTicks = clockTicks;
+                sprintf(uartMsg, "session:start");
+                uartState = SEND_MSG;
                 break;
 
             case PLAY_GAME:
@@ -178,18 +184,15 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
             default:
                 System_printf("ERROR, invalid menuState\n");
         }
-        System_flush();
     } else if (programState == MUSIC) {
         programState = MENU;
         System_printf("programState: MENU\n");
-        System_flush();
     } else if (programState == MOVE_DETECTION || programState == MOVE_DETECTION_DATA_READY || programState == MOVE_DETECTION_ALGORITHM){
         programState = MUSIC;
         nextState = MENU;
         //Clock_stop(clkmasaHandle);
         music = backMusic;
         System_printf("MOVE_DETECTION stopped!\n");
-        System_flush();
     } else if (programState == GAME) {
         if (pinValue_0 == 1) {
             char msg[30];
@@ -204,8 +207,8 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
             music = gameEndMusic;
             System_printf("Wrong button!\n");
         }
-        System_flush();
     }
+    System_flush();
 }
 
 /*This funktion is called when button 1 is pressed.
@@ -222,6 +225,8 @@ void button1Fxn(PIN_Handle handle, PIN_Id pinId) {
         switch(menuState){
             case MOVE:
                 System_printf("b0: start led-game\nb1: next state\n---\n");
+                sprintf(uartMsg, "MSG1:MENU: LED-game");
+                uartState = SEND_MSG;
                 //molemmat ledit p��lle
                 PIN_setOutputValue( ledHandle, Board_LED0, 1 );
                 PIN_setOutputValue( ledHandle, Board_LED1, 1 );
@@ -233,6 +238,8 @@ void button1Fxn(PIN_Handle handle, PIN_Id pinId) {
 
             case PLAY_GAME:
                 System_printf("b0: listen music\nb1: next state\n---\n");
+                sprintf(uartMsg, "MSG1:MENU: Listen music");
+                uartState = SEND_MSG;
                 //vain punainen led p��lle
                 PIN_setOutputValue( ledHandle, Board_LED0, 1 );
                 PIN_setOutputValue( ledHandle, Board_LED1, 0 );
@@ -244,6 +251,8 @@ void button1Fxn(PIN_Handle handle, PIN_Id pinId) {
 
             case PLAY_MUSIC:
                 System_printf("b0: Move your tamagotchi\nb1: next state\n---\n");
+                sprintf(uartMsg, "MSG1:MENU: Move your tamagotchi");
+                uartState = SEND_MSG;
                 //vain vihre� led p��lle
                 PIN_setOutputValue( ledHandle, Board_LED0, 0 );
                 PIN_setOutputValue( ledHandle, Board_LED1, 1 );
@@ -255,7 +264,6 @@ void button1Fxn(PIN_Handle handle, PIN_Id pinId) {
             default:
                 System_printf("ERROR, invalid menuState\n");
         }
-        System_flush();
     } else if (programState == GAME) {
         if (pinValue_1 == 1) {
             char msg[30];
@@ -270,8 +278,9 @@ void button1Fxn(PIN_Handle handle, PIN_Id pinId) {
             music = gameEndMusic;
             System_printf("Wrong button!\n");
         }
-        System_flush();
     }
+    System_flush();
+
 }
 
 
@@ -283,28 +292,30 @@ Void mpuFxn(PIN_Handle mpuHandle, PIN_Id pinId) {
 */
 
 static void uartFxn(UART_Handle uart, void *rxBuf, size_t len) {
+    /*
+    System_printf("uartFxn!\n");
+    System_flush();
+    nextState = programState;
+    programState = MSG_RECEIVED;
+    */
+
     char msg[30];
-    char msg2[30];
-   // Nyt meill� on siis haluttu m��r� merkkej� k�ytett�viss�
-   // rxBuf-taulukossa, pituus len, jota voimme k�sitell� halutusti
-   // T�ss� ne annetaan argumentiksi toiselle funktiolle (esimerkin vuoksi)
-   //tehdaan_jotain_nopeasti(rxBuf,len);
 
-    /*if(programState == MENU){
-        programState = UART_MSG_READY;
+    if(*(char *)rxBuf != '\0'){
+        sprintf(msg,"received: %c\n\r\0", *(char *)rxBuf);
+        //UART_write(uart, msg, strlen(msg) + 1);
+        System_printf(msg);
+        //sprintf(msg, "rxBuf: %x, len %d\0", rxBuf, len);
+        //System_printf(msg);
+    } else{
+        System_printf("0\n");
+    }
+    System_flush();
 
 
-    }*/
 
-   sprintf(msg,"received: %c\n\r", uartBuffer[0]);
-   //UART_write(uart, msg, strlen(msg));
-   System_printf(msg);
-   sprintf(msg2, "rxBuf: %x, len %d", rxBuf, len);
-   System_printf(msg2);
-   System_flush();
-
-   // K�sittelij�n viimeisen� asiana siirryt��n odottamaan uutta keskeytyst�..
-   UART_read(uart, rxBuf, 1);
+    // K�sittelij�n viimeisen� asiana siirryt��n odottamaan uutta keskeytyst�..
+    UART_read(uart, rxBuf, uartBufferSize);
 }
 
 Void clkFxn(UArg arg0) {
@@ -316,17 +327,15 @@ Void clkFxn(UArg arg0) {
 }
 
 /* Task Functions */
-/*
 static void uartTaskFxn(UArg arg0, UArg arg1) {
 
-    char merkkijono[32];
-    char testiviesti[] = "id:64,EAT:8,ping\n\r";
+    char msg[80];
 
-    // UART-kirjaston asetukset
+    // UART-library settings
     UART_Handle uart;
     UART_Params uartParams;
 
-    // Alustetaan sarjaliikenne
+    // intialise serial monitoring
     UART_Params_init(&uartParams);
     uartParams.writeDataMode = UART_DATA_TEXT;
     uartParams.readDataMode = UART_DATA_TEXT;
@@ -345,39 +354,44 @@ static void uartTaskFxn(UArg arg0, UArg arg1) {
     }
 
     //k�ynnist�� datan vastaanottamisen
-    UART_read(uart, uartBuffer, 1);
+    UART_read(uart, &uartBuffer, uartBufferSize);
 
     while (1) {
 
-        // JTKJ: Tehtävä 3. Kun tila on oikea, tulosta sensoridata merkkijonossa debug-ikkunaan
-        //       Muista tilamuutos
-        // JTKJ: Exercise 3. Print out sensor data as string to debug window if the state is correct
-        //       Remember to modify state
+        //testiviesti
+        //UART_write(uart, textmsg, strlen(textmsg) + 1);
 
-        /*
-        if(programState == DATA_READY){
-            programState = MENU;
-
-            sprintf(merkkijono,"valoisuus: %.2f luxia\n\r",ambientLight);
-            System_printf(merkkijono);
+        if(uartState == MSG_RECEIVED){
+            uartState = WAITING;
+            int i;
+            for (i = 0; i < uartBufferSize; i++){
+                if (uartBuffer[i] != '\0'){
+                    sprintf(msg,"%c", uartBuffer[i]);
+                } else {
+                    break;
+                }
+            }
+            System_printf(msg);
             System_flush();
-
-            // JTKJ: Tehtävä 4. Lähetä sama merkkijono UARTilla
-            // JTKJ: Exercise 4. Send the same sensor data string with UART
-            //UART_write(uart, merkkijono, strlen(merkkijono));
-
-            //testiviesti
-            //UART_write(uart, testiviesti, strlen(testiviesti));
-
-        }*/
+            sprintf(uartMsg, "%s", msg);
+            uartState == SEND_MSG;
+        } else if (uartState == SEND_MSG){
+            uartState = WAITING;
+            sprintf(msg, "id:2064,%s\0", uartMsg);
+            UART_write(uart, msg, strlen(msg) + 1);
+            System_printf("uart message:\n");
+            System_printf(msg);
+            System_printf("\n");
+            System_flush();
+        }
 
         // Just for sanity check for exercise, you can comment this out
         //System_printf("uartTask\n");
         //System_flush();
-        /*
-        Task_sleep(200000 / Clock_tickPeriod);
+
+        Task_sleep(100000 / Clock_tickPeriod);
     }
-}*/
+}
 
 Void sensorTaskFxn(UArg arg0, UArg arg1) {
 
@@ -445,8 +459,8 @@ Void sensorTaskFxn(UArg arg0, UArg arg1) {
         // JTKJ: Exercise 2. Read sensor data and print it to the Debug window as string
 
         /*
-        sprintf(merkkijono,"valoisuus: %.2f luxia\n",valoisuus);
-        System_printf(merkkijono);
+        sprintf(msg,"valoisuus: %.2f luxia\n",valoisuus);
+        System_printf(msg);
         System_flush();
         */
 
@@ -481,13 +495,16 @@ Void sensorTaskFxn(UArg arg0, UArg arg1) {
                 I2C_close(i2cMPU);
 
                 /*
-                //Testing data reading
+                //Test printing data. !Slow operation!
                 sprintf(msg, "dataIndex: %.d \n",dataIndex);
                 System_printf(msg);
                 sprintf(msg, "time: %.2f ax: %.2f, ay: %.2f, az: %.2f, gx: %.2f, gy: %.2f, gz: %.2f\n",time ,ax, ay, az, gx, gy, gz);
                 System_printf(msg);
                 System_flush();
                 */
+
+                sprintf(uartMsg, "time:%.2f,ax:%.2f,ay:%.2f,az:%.2f,gx:%.2f,gy:%.2f,gz:%.2f\n",time ,ax, ay, az, gx, gy, gz);
+                uartState = SEND_MSG;
 
                 //saving data to lists
                 timeData[dataIndex] = time;
@@ -498,6 +515,9 @@ Void sensorTaskFxn(UArg arg0, UArg arg1) {
                 gyData[dataIndex] = gy;
                 gzData[dataIndex] = gz;
                 dataIndex++;
+
+                sprintf(uartMsg, "MSG1:MENU: LED-game");
+                uartState = SEND_MSG;
 
             } else {
                 programState = MUSIC;
@@ -562,10 +582,12 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
             System_printf(msg);
             System_flush();
 
-            //clearAllData();
-
+            clearAllData();
+            //send message
+            sprintf(uartMsg, "session:end,EAT:8,EXERCISE:1");
+            uartState = SEND_MSG;
             programState = MUSIC;
-            nextState = SEND_DATA;
+            nextState = MENU;
             music = menuMusic;
         }
 
@@ -575,7 +597,7 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
 }
 
 Void dataTaskFxn(UArg arg0, UArg arg1){
-    char merkkijono[10];
+    char msg[10];
     dataIndex = 0;
 
     while (1){
@@ -600,16 +622,16 @@ Void dataTaskFxn(UArg arg0, UArg arg1){
             gzData[dataIndex] = gz;
             */
             /*
-            sprintf(merkkijono, "aika: %d\n", timeData[dataIndex]);
-            System_printf(merkkijono);
-            sprintf(merkkijono,"valoisuus: %.2f luxia\n",ambientLight);
-            System_printf(merkkijono);
+            sprintf(msg, "aika: %d\n", timeData[dataIndex]);
+            System_printf(msg);
+            sprintf(msg,"valoisuus: %.2f luxia\n",ambientLight);
+            System_printf(msg);
             */
             /*
-            sprintf(merkkijono, "dataIndex: %.d \n",dataIndex);
-            System_printf(merkkijono);
-            sprintf(merkkijono, "time: %.2f ax: %.2f, ay: %.2f, az: %.2f, gx: %.2f, gy: %.2f, gz: %.2f\n",time ,ax, ay, az, gx, gy, gz);
-            System_printf(merkkijono);
+            sprintf(msg, "dataIndex: %.d \n",dataIndex);
+            System_printf(msg);
+            sprintf(msg, "time: %.2f ax: %.2f, ay: %.2f, az: %.2f, gx: %.2f, gy: %.2f, gz: %.2f\n",time ,ax, ay, az, gx, gy, gz);
+            System_printf(msg);
             System_flush();
             */
 
@@ -728,8 +750,8 @@ void clearAllData(){
     // Task variables
     Task_Handle sensorTaskHandle;
     Task_Params sensorTaskParams;
-    //Task_Handle uartTaskHandle;
-    //Task_Params uartTaskParams;
+    Task_Handle uartTaskHandle;
+    Task_Params uartTaskParams;
     Task_Handle dataTaskHandle;
     Task_Params dataTaskParams;
     Task_Handle mainTaskHandle;
@@ -745,7 +767,7 @@ void clearAllData(){
     //Initialize UART
     Board_initUART();
 
-    //painonappi ja ledi k�ytt��n
+    //button and led
     button0Handle = PIN_open(&button0State, button0Config);
     if(!button0Handle) {
         System_abort("Error initializing button0 pins\n");
@@ -804,7 +826,7 @@ void clearAllData(){
     if (dataTaskHandle == NULL) {
         System_abort("dataTask create failed!");
     }
-    /*
+
     Task_Params_init(&uartTaskParams);
     uartTaskParams.stackSize = STACKSIZE;
     uartTaskParams.stack = &uartTaskStack;
@@ -813,7 +835,7 @@ void clearAllData(){
     if (uartTaskHandle == NULL) {
         System_abort("uartTask create failed!");
     }
-    */
+
 
     Task_Params_init(&mainTaskParams);
     mainTaskParams.stackSize = STACKSIZE;
