@@ -43,7 +43,7 @@ static int gameMusic[] = {
                 170, 8, 300, 16, 300, 8, 500, 16, -1
 };
 static int gamePointMusic[] = {
-                89, 16, 210, 16, -1
+                319, 16, 510, 16, -1
 };
 static int gameEndMusic[] = {
                    415, 16, 400, 16, 380, 16 ,230, 32, 230, 32, 230,23, 190, 2, -1

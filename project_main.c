@@ -42,7 +42,7 @@ Char dataTaskStack[STACKSIZE];
 Char mainTaskStack[STACKSIZE];
 
 //Tilamuuttujat
-enum state { MENU=1, DATA_READY, UART_MSG_READY, MUSIC, SEND_DATA, MOVE_DETECTION, MOVE_DETECTION_DATA_READY, MOVE_DETECTION_ALGORITHM, GAME};
+enum state { MENU=1, DATA_READY, UART_MSG_READY, MUSIC, SEND_DATA, MOVE_DETECTION, MOVE_DETECTION_DATA_READY, MOVE_DETECTION_ALGORITHM, GAME, GAME_END};
 enum stateMenu {MOVE, PLAY_GAME, PLAY_MUSIC};
 enum state programState = MENU;
 enum stateMenu menuState =  MOVE;
@@ -57,6 +57,7 @@ int *music;
 float ambientLight = -1000.0;
 float ax, ay, az, gx, gy, gz, time;
 char uartBuffer[10];
+int getPoint = 0;
 
 //Data for move detection
 int dataIndex;
@@ -81,7 +82,8 @@ static PIN_Handle button0Handle;
 static PIN_State button0State;
 static PIN_Handle button1Handle;
 static PIN_State button1State;
-static PIN_Handle ledHandle;
+static PIN_Handle led0Handle;
+static PIN_Handle led1Handle;
 static PIN_State ledState;
 static PIN_Handle buzzerHandle;
 static PIN_State buzzerState;
@@ -161,11 +163,11 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
 
             case PLAY_GAME:
                 //led-game;
-                PIN_setOutputValue( ledHandle, Board_LED0, 1 );
-                PIN_setOutputValue( ledHandle, Board_LED1, 0 );
+                PIN_setOutputValue( led0Handle, Board_LED0, 1 );
+                PIN_setOutputValue( led1Handle, Board_LED1, 0 );
                 programState = MUSIC;
                 nextState = GAME;
-                System_printf("Push button0 when red led is on.\nPush button1 when green led is on.\n");
+                System_printf("Push button0 when green led is on.\nPush button1 when red led is on.\n");
                 music = chooseMusic;
                 gameStartTicks = clockTicks;
                 break;
@@ -192,17 +194,20 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
         System_flush();
     } else if (programState == GAME) {
         if (pinValue_0 == 1) {
-            char msg[30];
-            programState = MUSIC;
-            nextState = GAME;
-            music = gamePointMusic;
-            sprintf(msg, "You get a point! pinValue_0 : %d\n", pinValue_0);
-            System_printf(msg);
+            if (getPoint == 0) {
+                char msg[30];
+                programState = MUSIC;
+                nextState = GAME;
+                music = gamePointMusic;
+                sprintf(msg, "You get a point! pinValue_0 : %d\n", pinValue_1);
+                System_printf(msg);
+                getPoint = getPoint + 1;
+            }
         }
         else {
-            programState = MENU;
-            music = gameEndMusic;
+            programState = GAME_END;
             System_printf("Wrong button!\n");
+            gameStartTicks = clockTicks;
         }
         System_flush();
     }
@@ -223,8 +228,8 @@ void button1Fxn(PIN_Handle handle, PIN_Id pinId) {
             case MOVE:
                 System_printf("b0: start led-game\nb1: next state\n---\n");
                 //molemmat ledit p��lle
-                PIN_setOutputValue( ledHandle, Board_LED0, 1 );
-                PIN_setOutputValue( ledHandle, Board_LED1, 1 );
+                PIN_setOutputValue( led0Handle, Board_LED0, 1 );
+                PIN_setOutputValue( led1Handle, Board_LED1, 1 );
                 programState = MUSIC;
                 nextState = MENU;
                 music = gameMusic;
@@ -234,8 +239,8 @@ void button1Fxn(PIN_Handle handle, PIN_Id pinId) {
             case PLAY_GAME:
                 System_printf("b0: listen music\nb1: next state\n---\n");
                 //vain punainen led p��lle
-                PIN_setOutputValue( ledHandle, Board_LED0, 1 );
-                PIN_setOutputValue( ledHandle, Board_LED1, 0 );
+                PIN_setOutputValue( led0Handle, Board_LED0, 1 );
+                PIN_setOutputValue( led1Handle, Board_LED1, 0 );
                 programState = MUSIC;
                 nextState = MENU;
                 music = listenMusic;
@@ -245,8 +250,8 @@ void button1Fxn(PIN_Handle handle, PIN_Id pinId) {
             case PLAY_MUSIC:
                 System_printf("b0: Move your tamagotchi\nb1: next state\n---\n");
                 //vain vihre� led p��lle
-                PIN_setOutputValue( ledHandle, Board_LED0, 0 );
-                PIN_setOutputValue( ledHandle, Board_LED1, 1 );
+                PIN_setOutputValue( led0Handle, Board_LED0, 0 );
+                PIN_setOutputValue( led1Handle, Board_LED1, 1 );
                 programState = MUSIC;
                 nextState = MENU;
                 music = moveMusic;
@@ -258,17 +263,20 @@ void button1Fxn(PIN_Handle handle, PIN_Id pinId) {
         System_flush();
     } else if (programState == GAME) {
         if (pinValue_1 == 1) {
-            char msg[30];
-            programState = MUSIC;
-            nextState = GAME;
-            music = gamePointMusic;
-            sprintf(msg, "You get a point! pinValue_0 : %d\n", pinValue_1);
-            System_printf(msg);
+            if (getPoint == 0) {
+                char msg[30];
+                programState = MUSIC;
+                nextState = GAME;
+                music = gamePointMusic;
+                sprintf(msg, "You get a point! pinValue_0 : %d\n", pinValue_1);
+                System_printf(msg);
+                getPoint = getPoint + 1;
+            }
         }
         else {
-            programState = MENU;
-            music = gameEndMusic;
+            programState = GAME_END;
             System_printf("Wrong button!\n");
+            gameStartTicks = clockTicks;
         }
         System_flush();
     }
@@ -523,8 +531,9 @@ Void sensorTaskFxn(UArg arg0, UArg arg1) {
 Void mainTaskFxn(UArg arg0, UArg arg1) {
     //vihre� led palaa aluksi
     System_printf("b0: Move your tamagotchi\nb1: next state\n---\n");
-    PIN_setOutputValue( ledHandle, Board_LED0, 1 );
+    PIN_setOutputValue( led0Handle, Board_LED0, 1 );
     int blinkAccelator = 1;
+    int endBlinks = 0;
 
 
 
@@ -543,16 +552,45 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
                 //System_flush();
                 pinValue_0 = PIN_getOutputValue( Board_LED0 );
                 pinValue_0 = !pinValue_0;
-                PIN_setOutputValue( ledHandle, Board_LED0, pinValue_0 );
+                PIN_setOutputValue( led0Handle, Board_LED0, pinValue_0 );
                 pinValue_1 = PIN_getOutputValue( Board_LED1 );
                 pinValue_1 = !pinValue_1;
-                PIN_setOutputValue( ledHandle, Board_LED1, pinValue_1 );
+                PIN_setOutputValue( led1Handle, Board_LED1, pinValue_1 );
+
                 if (blinkAccelator < 1800) {
                     blinkAccelator = blinkAccelator + 100;
                 }
+                getPoint = 0;
                 gameStartTicks = clockTicks;
             }
-        } else if (programState == MOVE_DETECTION_ALGORITHM){
+        } else if (programState == GAME_END) {
+            //both LEDs blinks three times
+            if ((clockTicks - gameStartTicks) * Clock_tickPeriod / 1000 > 50) {
+                if (endBlinks == 0) {
+                    pinValue_0 = 1;
+                    pinValue_1 = 1;
+                    endBlinks = endBlinks + 1;
+                }
+                else if (endBlinks > 0 && endBlinks < 10) {
+                    pinValue_1 = !pinValue_1;
+                    pinValue_0 = !pinValue_0;
+                    endBlinks = endBlinks + 1;
+                }
+                PIN_setOutputValue( led0Handle, Board_LED0, pinValue_1 );
+                PIN_setOutputValue( led1Handle, Board_LED1, pinValue_1 );
+                gameStartTicks = clockTicks;
+                if (endBlinks >= 10) {
+                    PIN_setOutputValue( led0Handle, Board_LED0, 1 );
+                    PIN_setOutputValue( led1Handle, Board_LED1, 1 );
+                    blinkAccelator = 1;
+                    endBlinks = 0;
+                    getPoint = 0;
+                    programState = MUSIC;
+                    nextState = MENU;
+                    music = gameEndMusic;
+                }
+            }
+        } else if (programState == MOVE_DETECTION_ALGORITHM) {
             int peaks = peakCount(timeData, axData, dataSize, 0.25, 1, 0);
             char msg[30];
             sprintf(msg, "peakCount without error margin = %d\n", peaks);
@@ -754,15 +792,14 @@ void clearAllData(){
     if(!button1Handle) {
         System_abort("Error initializing button1 pins\n");
     }
-    ledHandle = PIN_open(&ledState, led1Config);
-    if(!ledHandle) {
-       System_abort("Error initializing LED pins\n");
-    }
-    ledHandle = PIN_open(&ledState, led0Config);
-    if(!ledHandle) {
+    led0Handle = PIN_open(&ledState, led0Config);
+    if(!led0Handle) {
     System_abort("Error initializing LED pins\n");
     }
-
+    led1Handle = PIN_open(&ledState, led1Config);
+    if(!led1Handle) {
+       System_abort("Error initializing LED pins\n");
+    }
     if (PIN_registerIntCb(button0Handle, &button0Fxn) != 0) {
        System_abort("Error registering button0 callback function");
     }
