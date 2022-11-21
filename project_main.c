@@ -186,7 +186,7 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
             default:
                 System_printf("ERROR, invalid menuState\n");
         }
-    } else if (programState == MUSIC) {
+    } else if (programState == MUSIC && nextState != GAME) {
         programState = MENU;
         System_printf("programState: MENU\n");
     } else if (programState == MOVE_DETECTION || programState == MOVE_DETECTION_DATA_READY || programState == MOVE_DETECTION_ALGORITHM){
@@ -347,8 +347,8 @@ static void uartTaskFxn(UArg arg0, UArg arg1) {
         if(uartState == MSG_RECEIVED){
             uartState = WAITING;
             sprintf(msg, "Uartmsg: %s\n", uartBuffer);
-            System_printf(msg);
-            System_flush();
+            //System_printf(msg);
+            //System_flush();
 
             //send message back, for testing
             sprintf(uartMsg, "%s", uartBuffer);
@@ -357,10 +357,12 @@ static void uartTaskFxn(UArg arg0, UArg arg1) {
             uartState = WAITING;
             sprintf(msg, "id:2064,%s\0", uartMsg);
             UART_write(uart, msg, strlen(msg) + 1);
-            System_printf("uart message:\n");
+            /*
+            System_printf("Sendmsg:\n");
             System_printf(msg);
             System_printf("\n");
             System_flush();
+            */
         }
 
         // Just for sanity check for exercise, you can comment this out
@@ -494,9 +496,6 @@ Void sensorTaskFxn(UArg arg0, UArg arg1) {
                 gzData[dataIndex] = gz;
                 dataIndex++;
 
-                sprintf(uartMsg, "MSG1:MENU: LED-game");
-                uartState = SEND_MSG;
-
             } else {
                 programState = MUSIC;
                 nextState = MOVE_DETECTION_ALGORITHM;
@@ -581,6 +580,11 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
                 }
             }
         } else if (programState == MOVE_DETECTION_ALGORITHM) {
+
+            float lista[] = {1,2,3,4,5,6,7,8,9,10};
+
+            float avgAz = average(&lista, 10);
+
             int peaks = peakCount(timeData, axData, dataSize, 0.25, 1, 0);
             char msg[30];
             sprintf(msg, "peakCount without error margin = %d\n", peaks);
