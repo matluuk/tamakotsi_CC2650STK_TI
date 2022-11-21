@@ -58,8 +58,8 @@ int *music;
 //Globaalit muutujat
 float ambientLight = -1000.0;
 float ax, ay, az, gx, gy, gz, time;
-int uartBufferSize = 1;
-char uartBuffer[1];
+int uartBufferSize = 80;
+char uartBuffer[80];
 char uartMsg[80];
 
 //Data for move detection
@@ -292,27 +292,10 @@ Void mpuFxn(PIN_Handle mpuHandle, PIN_Id pinId) {
 */
 
 static void uartFxn(UART_Handle uart, void *rxBuf, size_t len) {
-    /*
+
     System_printf("uartFxn!\n");
     System_flush();
-    nextState = programState;
-    programState = MSG_RECEIVED;
-    */
-
-    char msg[30];
-
-    if(*(char *)rxBuf != '\0'){
-        sprintf(msg,"received: %c\n\r\0", *(char *)rxBuf);
-        //UART_write(uart, msg, strlen(msg) + 1);
-        System_printf(msg);
-        //sprintf(msg, "rxBuf: %x, len %d\0", rxBuf, len);
-        //System_printf(msg);
-    } else{
-        System_printf("0\n");
-    }
-    System_flush();
-
-
+    uartState = MSG_RECEIVED;
 
     // K�sittelij�n viimeisen� asiana siirryt��n odottamaan uutta keskeytyst�..
     UART_read(uart, rxBuf, uartBufferSize);
@@ -329,7 +312,7 @@ Void clkFxn(UArg arg0) {
 /* Task Functions */
 static void uartTaskFxn(UArg arg0, UArg arg1) {
 
-    char msg[80];
+    char msg[85];
 
     // UART-library settings
     UART_Handle uart;
@@ -357,24 +340,15 @@ static void uartTaskFxn(UArg arg0, UArg arg1) {
     UART_read(uart, &uartBuffer, uartBufferSize);
 
     while (1) {
-
-        //testiviesti
-        //UART_write(uart, textmsg, strlen(textmsg) + 1);
-
         if(uartState == MSG_RECEIVED){
             uartState = WAITING;
-            int i;
-            for (i = 0; i < uartBufferSize; i++){
-                if (uartBuffer[i] != '\0'){
-                    sprintf(msg,"%c", uartBuffer[i]);
-                } else {
-                    break;
-                }
-            }
+            sprintf(msg, "Uartmsg: %s\n", uartBuffer);
             System_printf(msg);
             System_flush();
-            sprintf(uartMsg, "%s", msg);
-            uartState == SEND_MSG;
+
+            //send message back, for testing
+            sprintf(uartMsg, "%s", uartBuffer);
+            uartState = SEND_MSG;
         } else if (uartState == SEND_MSG){
             uartState = WAITING;
             sprintf(msg, "id:2064,%s\0", uartMsg);
