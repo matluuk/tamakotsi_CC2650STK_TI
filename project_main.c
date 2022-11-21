@@ -60,7 +60,7 @@ float ax, ay, az, gx, gy, gz, time;
 int uartBufferSize = 80;
 char uartBuffer[80];
 char uartMsg[80];
-int getPoint = 1;
+int getPoint = 0;
 
 //Data for move detection
 int dataIndex;
@@ -579,7 +579,7 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
                     PIN_setOutputValue( led1Handle, Board_LED1, 1 );
                     blinkAccelator = 1;
                     endBlinks = 0;
-                    getPoint = 1;
+                    getPoint = 0;
                     programState = MUSIC;
                     nextState = MENU;
                     music = gameEndMusic;
