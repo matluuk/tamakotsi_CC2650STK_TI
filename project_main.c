@@ -41,27 +41,26 @@ Char uartTaskStack[STACKSIZE];
 Char dataTaskStack[STACKSIZE];
 Char mainTaskStack[STACKSIZE];
 
-//Tilamuuttujat
+//State Variables
 enum state { MENU=1, DATA_READY, MUSIC, SEND_DATA, MOVE_DETECTION, MOVE_DETECTION_DATA_READY, MOVE_DETECTION_ALGORITHM, GAME, GAME_END};
 enum stateUart {WAITING=1, MSG_RECEIVED, SEND_MSG};
 enum stateMenu {MOVE, PLAY_GAME, PLAY_MUSIC};
 enum state programState = MENU;
 enum stateUart uartState = WAITING;
 enum stateMenu menuState =  MOVE;
-//seuraava tilamuutos
+//
 enum state nextState;
-//chosen music
+//Chosen Music
 int *music;
-//Menu
 
 
-//Globaalit muutujat
+//Global Variables
 float ambientLight = -1000.0;
 float ax, ay, az, gx, gy, gz, time;
 int uartBufferSize = 1;
 char uartBuffer[1];
 char uartMsg[80];
-int getPoint = 0;
+int getPoint = 1;
 
 //Data for move detection
 int dataIndex;
@@ -75,7 +74,7 @@ float gyData[85];
 float gzData[85];
 float timeData[85];
 
-//time variables in (ticks).
+//Time variables in (ticks).
 Uint32 clockTicks = 0;
 Uint32 mpuStartTicks = 0;
 Uint32 gameStartTicks = 0;
@@ -91,11 +90,11 @@ static PIN_Handle led1Handle;
 static PIN_State ledState;
 static PIN_Handle buzzerHandle;
 static PIN_State buzzerState;
-// RTOS-muuttujat MPU9250-pinneille
+// RTOS-variables MPU9250-pins
 static PIN_Handle mpuHandle;
 //static PIN_State mpuState;
 
-// RTOS:n kellomuuttujat
+// RTOS:n clockvariables
 Clock_Handle clkmasaHandle;
 Clock_Params clkmasaParams;
 Clock_Handle clkHandle;
@@ -147,9 +146,15 @@ static const I2CCC26XX_I2CPinCfg i2cMPUCfg = {
 
 
 
-/*This funktion is called when button 0 is pressed.
+/* this function is called when button0 is pressed
  * MENU:
- * select funktion.
+ * select function
+ * MUSIC:
+ * stop music
+ * MOVE:
+ * stop move detection
+ * GAME:
+ * when green led is on, player have to push button0 to get point
  */
 void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
 
@@ -168,7 +173,6 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
                 break;
 
             case PLAY_GAME:
-                //led-game;
                 PIN_setOutputValue( led0Handle, Board_LED0, 1 );
                 PIN_setOutputValue( led1Handle, Board_LED1, 0 );
                 programState = MUSIC;
@@ -216,9 +220,11 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
     System_flush();
 }
 
-/*This funktion is called when button 1 is pressed.
+/* this funktion is called when button 1 is pressed
  * MENU:
- * roll menu with this button.
+ * roll menu with this button
+ * GAME:
+ * when green led is on, player have to push button1 to get point
  *
  */
 
@@ -232,7 +238,7 @@ void button1Fxn(PIN_Handle handle, PIN_Id pinId) {
                 System_printf("b0: start led-game\nb1: next state\n---\n");
                 sprintf(uartMsg, "MSG1:MENU: LED-game");
                 uartState = SEND_MSG;
-                //molemmat ledit p��lle
+                //Both LEDs on
                 PIN_setOutputValue( led0Handle, Board_LED0, 1 );
                 PIN_setOutputValue( led1Handle, Board_LED1, 1 );
                 programState = MUSIC;
@@ -322,7 +328,7 @@ static void uartFxn(UART_Handle uart, void *rxBuf, size_t len) {
 
 
 
-    // K�sittelij�n viimeisen� asiana siirryt��n odottamaan uutta keskeytyst�..
+    // Kasittelijan viimeisena asiana siirrytaan odottamaan uutta keskeytysta.
     UART_read(uart, rxBuf, uartBufferSize);
 }
 
@@ -378,7 +384,7 @@ static void uartTaskFxn(UArg arg0, UArg arg1) {
             System_printf(msg);
             System_flush();
             sprintf(uartMsg, "%s", msg);
-            uartState == SEND_MSG;
+            uartState = SEND_MSG;
         } else if (uartState == SEND_MSG){
             uartState = WAITING;
             sprintf(msg, "id:2064,%s\0", uartMsg);
@@ -545,9 +551,9 @@ Void sensorTaskFxn(UArg arg0, UArg arg1) {
 
 
 Void mainTaskFxn(UArg arg0, UArg arg1) {
-    //vihre� led palaa aluksi
+    //at the beginning of program red led is on
     System_printf("b0: Move your tamagotchi\nb1: next state\n---\n");
-    PIN_setOutputValue( led0Handle, Board_LED0, 1 );
+    PIN_setOutputValue( led1Handle, Board_LED1, 1 );
     int blinkAccelator = 1;
     int endBlinks = 0;
 
@@ -555,7 +561,7 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
 
     while (1){
 
-        //soittaa musiikkia
+        //play music
         if(programState == MUSIC) {
             //System_printf("Playing music.\n");
             //System_flush();
@@ -580,7 +586,7 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
                 gameStartTicks = clockTicks;
             }
         } else if (programState == GAME_END) {
-            //both LEDs blinks three times
+            //Both LEDs blinks 5 times.
             if ((clockTicks - gameStartTicks) * Clock_tickPeriod / 1000 > 50) {
                 if (endBlinks == 0) {
                     pinValue_0 = 1;
@@ -600,7 +606,7 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
                     PIN_setOutputValue( led1Handle, Board_LED1, 1 );
                     blinkAccelator = 1;
                     endBlinks = 0;
-                    getPoint = 0;
+                    getPoint = 1;
                     programState = MUSIC;
                     nextState = MENU;
                     music = gameEndMusic;
@@ -801,7 +807,7 @@ void clearAllData(){
     //Initialize UART
     Board_initUART();
 
-    //button and led
+    //buttons and LEDs
     button0Handle = PIN_open(&button0State, button0Config);
     if(!button0Handle) {
         System_abort("Error initializing button0 pins\n");

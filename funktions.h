@@ -10,7 +10,7 @@
 #ifndef FUNKTIONS_H_
 #define FUNKTIONS_H_
 
-//prototypes for funktions.
+//prototypes for functions.
 void clearData(float*data, int size);
 int peakCount(float *time, float *data, float dataSize, float treshold, int direction, float peakTime);
 
