@@ -45,9 +45,12 @@ Char mainTaskStack[STACKSIZE];
 enum state { MENU=1, DATA_READY, MUSIC, SEND_DATA, MOVE_DETECTION, MOVE_DETECTION_DATA_READY, MOVE_DETECTION_ALGORITHM, GAME, GAME_END};
 enum stateUart {WAITING=1, MSG_RECEIVED, SEND_MSG};
 enum stateMenu {MOVE, PLAY_GAME, PLAY_MUSIC};
+enum stateBrightness {DARK, BRIGHT};
+
 enum state programState = MENU;
 enum stateUart uartState = WAITING;
 enum stateMenu menuState =  MOVE;
+enum stateBrightness brightnessState = DARK;
 //
 enum state nextState;
 //Chosen Music
@@ -55,7 +58,7 @@ int *music;
 
 
 //Global Variables
-float ambientLight = -1000.0;
+float ambientLight = -1001.0;
 float ax, ay, az, gx, gy, gz, time;
 int uartBufferSize = 80;
 char uartBuffer[80];
@@ -78,6 +81,7 @@ float timeData[85];
 Uint32 clockTicks = 0;
 Uint32 mpuStartTicks = 0;
 Uint32 gameStartTicks = 0;
+Uint32 lastTimeTicks = 0;
 
 
 // RTOS pin handles
@@ -95,8 +99,6 @@ static PIN_Handle mpuHandle;
 //static PIN_State mpuState;
 
 // RTOS:n clockvariables
-Clock_Handle clkmasaHandle;
-Clock_Params clkmasaParams;
 Clock_Handle clkHandle;
 Clock_Params clkParams;
 
@@ -386,6 +388,8 @@ Void sensorTaskFxn(UArg arg0, UArg arg1) {
     I2C_Handle i2cMPU; // Own i2c-interface for MPU9250 sensor
     I2C_Params i2cMPUParams;
     char msg[30];
+    lastTimeTicks = 0;
+
 
     //Configure i2cMPU
     I2C_Params_init(&i2cMPUParams);
@@ -455,15 +459,35 @@ Void sensorTaskFxn(UArg arg0, UArg arg1) {
         // JTKJ: Exercise 3. Save the sensor value into the global variable
         //       Remember to modify state
 
-        //open i2c
-        i2c = I2C_open(Board_I2C_TMP, &i2cParams);
-        if (i2c == NULL) {
-          System_abort("Error Initializing I2C\n");
-        }
-        //ambientLight = opt3001_get_data(&i2c);
 
-        //close i2c
-        I2C_close(i2c);
+        if ((clockTicks - lastTimeTicks) * Clock_tickPeriod < 4000000 ){
+            //open i2c
+            i2c = I2C_open(Board_I2C_TMP, &i2cParams);
+            if (i2c == NULL) {
+              System_abort("Error Initializing I2C\n");
+            }
+
+                ambientLight = opt3001_get_data(&i2c);
+
+                if (ambientLight <= 65 && ambientLight > 0){
+                    brightnessState = DARK;
+                    /*sprintf(msg," On pimeää, valoisuus: %.2f luxia\n",ambientLight);
+                    System_printf(msg);
+                    System_flush();*/
+                }
+                else if  (ambientLight > 65){
+                    brightnessState = BRIGHT;
+                    /*sprintf(msg," On valoisaa, valoisuus: %.2f luxia\n",ambientLight);
+                    System_printf(msg);
+                    System_flush();*/
+                }
+
+                lastTimeTicks = clockTicks;
+
+            //close i2c
+            I2C_close(i2c);
+
+        }
 
         if (programState == MOVE_DETECTION){
             programState = MOVE_DETECTION_DATA_READY;

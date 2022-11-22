@@ -103,10 +103,10 @@ double opt3001_get_data(I2C_Handle *i2c) {
 			System_flush();
 		}
 
-	} else {
+	} /*else {
 		System_printf("OPT3001: Data not ready!\n");
 		System_flush();
-	}
+	}*/
 
 	return lux;
 }
