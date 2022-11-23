@@ -66,13 +66,12 @@ int getPoint = 0;
 //Data for move detection
 int dataIndex;
 int dataSize = 85;
-float lightData[85];
-float axData[85];
-float ayData[85];
-float azData[85];
-float gxData[85];
-float gyData[85];
-float gzData[85];
+float dataAx[85];
+float dataAy[85];
+float dataAz[85];
+float dataGx[85];
+float dataGy[85];
+float dataGz[85];
 float timeData[85];
 
 //time variables in (ticks).
@@ -300,9 +299,10 @@ Void mpuFxn(PIN_Handle mpuHandle, PIN_Id pinId) {
 */
 
 static void uartFxn(UART_Handle uart, void *rxBuf, size_t len) {
-
+    /*
     System_printf("uartFxn!\n");
     System_flush();
+    */
     uartState = MSG_RECEIVED;
 
     // K�sittelij�n viimeisen� asiana siirryt��n odottamaan uutta keskeytyst�..
@@ -369,7 +369,7 @@ static void uartTaskFxn(UArg arg0, UArg arg1) {
         //System_printf("uartTask\n");
         //System_flush();
 
-        Task_sleep(100000 / Clock_tickPeriod);
+        Task_sleep(50000 / Clock_tickPeriod);
     }
 }
 
@@ -474,26 +474,17 @@ Void sensorTaskFxn(UArg arg0, UArg arg1) {
                 //MPU close i2c
                 I2C_close(i2cMPU);
 
-                /*
-                //Test printing data. !Slow operation!
-                sprintf(msg, "dataIndex: %.d \n",dataIndex);
-                System_printf(msg);
-                sprintf(msg, "time: %.2f ax: %.2f, ay: %.2f, az: %.2f, gx: %.2f, gy: %.2f, gz: %.2f\n",time ,ax, ay, az, gx, gy, gz);
-                System_printf(msg);
-                System_flush();
-                */
-
-                sprintf(uartMsg, "time:%.2f,ax:%.2f,ay:%.2f,az:%.2f,gx:%.2f,gy:%.2f,gz:%.2f\n",time ,ax, ay, az, gx, gy, gz);
+                sprintf(uartMsg, "time:%.2f,ax:%.2f,ay:%.2f,az:%.2f,gx:%.2f,gy:%.2f,gz:%.2f\n",(time - mpuStartTicks) ,ax, ay, az, gx, gy, gz);
                 uartState = SEND_MSG;
 
                 //saving data to lists
                 timeData[dataIndex] = time;
-                axData[dataIndex] = ax;
-                ayData[dataIndex] = ay;
-                azData[dataIndex] = az;
-                gxData[dataIndex] = gx;
-                gyData[dataIndex] = gy;
-                gzData[dataIndex] = gz;
+                dataAx[dataIndex] = ax;
+                dataAy[dataIndex] = ay;
+                dataAz[dataIndex] = az;
+                dataGx[dataIndex] = gx;
+                dataGy[dataIndex] = gy;
+                dataGz[dataIndex] = gz;
                 dataIndex++;
 
             } else {
@@ -518,23 +509,24 @@ Void sensorTaskFxn(UArg arg0, UArg arg1) {
 
 
 Void mainTaskFxn(UArg arg0, UArg arg1) {
-    //vihre� led palaa aluksi
-    System_printf("b0: Move your tamagotchi\nb1: next state\n---\n");
-    PIN_setOutputValue( led0Handle, Board_LED0, 1 );
+    //Variables
+    char msg[30];
     int blinkAccelator = 1;
     int endBlinks = 0;
 
 
 
-    while (1){
+    //green led is on at start
+    System_printf("b0: Move your tamagotchi\nb1: next state\n---\n");
+    PIN_setOutputValue( led0Handle, Board_LED0, 1 );
 
-        //soittaa musiikkia
+
+    while (1){
         if(programState == MUSIC) {
             //System_printf("Playing music.\n");
             //System_flush();
             playMusic(buzzerHandle, music, 144);
             programState = nextState;
-            //System_printf("programState: nextState\n");
         } else if (programState == GAME) {
             if ((clockTicks - gameStartTicks) * Clock_tickPeriod / 1000 > 2000 - blinkAccelator) {
                 //System_printf("led changes/n");
@@ -581,16 +573,52 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
             }
         } else if (programState == MOVE_DETECTION_ALGORITHM) {
 
-            float lista[] = {1,2,3,4,5,6,7,8,9,10};
+            float peakTreshold = 0.25;
+            int peaks = 0;
 
-            float avgAz = average(&lista, 10);
-
-            int peaks = peakCount(timeData, axData, dataSize, 0.25, 1, 0);
-            char msg[30];
-            sprintf(msg, "peakCount without error margin = %d\n", peaks);
+            float avgAx = average(dataAx, dataSize);
+            float avgAy = average(dataAx, dataSize);
+            float avgAz = average(dataAx, dataSize);
+            sprintf(msg, "avgAx: %.2f\n", avgAx);
             System_printf(msg);
-            peaks = peakCountMargin(&time, &ax, &ay, &az, dataSize, 'x', 0.25, 0.1, 0);
-            sprintf(msg, "peakCount with error margin = %d\n", peaks);
+            sprintf(msg, "avgAy: %.2f\n", avgAy);
+            System_printf(msg);
+            sprintf(msg, "avgAz: %.2f\n", avgAz);
+            System_printf(msg);
+            System_flush();
+
+            //display peaks + side
+            System_printf("peakCounts without error margin + side:\n");
+            peaks = peakCount(timeData, dataAx, dataSize, peakTreshold, 1, 0);
+            sprintf(msg, "Ax: = %d\n", peaks);
+            System_printf(msg);
+            peaks = peakCount(timeData, dataAy, dataSize, peakTreshold, 1, 0);
+            sprintf(msg, "Ay: = %d\n", peaks);
+            System_printf(msg);
+            peaks = peakCount(timeData, dataAz, dataSize, peakTreshold, 1, 0);
+            sprintf(msg, "Az: = %d\n", peaks);
+            System_printf(msg);
+            System_flush();
+
+            //display peaks - side
+            System_printf("peakCounts with error margin + side:\n");
+            peaks = peakCountMargin(&time, dataAx, dataAy, dataAz, dataSize, 'x', 0.25, 0.1, 0);
+            sprintf(msg, "Ax: = %d\n", peaks);
+            System_printf(msg);
+            peaks = peakCountMargin(&time, dataAx, dataAy, dataAz, dataSize, 'y', 0.25, 0.1, 0);
+            sprintf(msg, "Ay: = %d\n", peaks);
+            System_printf(msg);
+            peaks = peakCountMargin(&time, dataAx, dataAy, dataAz, dataSize, 'z', 0.25, 0.1, 0);
+            sprintf(msg, "Az: = %d\n", peaks);
+            System_printf(msg);
+            System_flush();
+
+            peaks = peakCountMargin(&time, dataAx, dataAy, dataAz, dataSize, 'x', 0.25, 0.1, 0);
+            if (peaks < 0){
+                sprintf(msg, "peakCount with error margin = Error margin srikes: %d\n", peaks);
+            }else{
+                sprintf(msg, "peakCount with error margin = %d\n", peaks);
+            }
             System_printf(msg);
             System_flush();
 
@@ -626,12 +654,12 @@ Void dataTaskFxn(UArg arg0, UArg arg1){
             //save data to lists
             /*
             timeData[dataIndex] = time - timeData[0];
-            axData[dataIndex] = ax;
-            ayData[dataIndex] = ay;
-            azData[dataIndex] = az;
-            gxData[dataIndex] = gx;
-            gyData[dataIndex] = gy;
-            gzData[dataIndex] = gz;
+            dataAx[dataIndex] = ax;
+            dataAy[dataIndex] = ay;
+            dataAz[dataIndex] = az;
+            dataGx[dataIndex] = gx;
+            dataGy[dataIndex] = gy;
+            dataGz[dataIndex] = gz;
             */
             /*
             sprintf(msg, "aika: %d\n", timeData[dataIndex]);
@@ -679,12 +707,12 @@ void sendData(){
 
         sprintf(msgg, "%05f,%05f,%05f,%05f,%05f,%05f,%05f\n",
                 timeData[i] - timeData[0],
-                axData[i],
-                ayData[i],
-                azData[i],
-                gxData[i],
-                gyData[i],
-                gzData[i]);
+                dataAx[i],
+                dataAy[i],
+                dataAz[i],
+                dataGx[i],
+                dataGy[i],
+                dataGz[i]);
         System_printf(msgg);
         System_flush();
     }
@@ -745,12 +773,12 @@ void playMusic(PIN_Handle buzzerPin, int *note, int tempo){
 }
 
 void clearAllData(){
-    clearData(axData, dataSize);
-    clearData(ayData, dataSize);
-    clearData(azData, dataSize);
-    clearData(gxData, dataSize);
-    clearData(gyData, dataSize);
-    clearData(gzData, dataSize);
+    clearData(dataAx, dataSize);
+    clearData(dataAy, dataSize);
+    clearData(dataAz, dataSize);
+    clearData(dataGx, dataSize);
+    clearData(dataGy, dataSize);
+    clearData(dataGz, dataSize);
     clearData(timeData, dataSize);
     System_printf("All data cleared!\n");
     System_flush();

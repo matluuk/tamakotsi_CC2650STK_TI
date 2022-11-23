@@ -5,6 +5,8 @@
  *      Author: matti
  */
 
+#include <inttypes.h>
+
 int peakCount(float *time, float *data, float dataSize, float treshold, float tresholdOffset, int direction, float peakTime){
     int countPos = 0;
     int peakCountPos = 0;
@@ -17,7 +19,7 @@ int peakCount(float *time, float *data, float dataSize, float treshold, float tr
             if (data[i] - tresholdOffset >= treshold) {
                 countPos++;
             } else if (countPos){
-                //chack if peak is long enough
+                //check if peak is long enough
                 if((time[i] - time[i - countPos]) >= peakTime){
                     peakCountPos++;
                 }
@@ -29,7 +31,7 @@ int peakCount(float *time, float *data, float dataSize, float treshold, float tr
             if (data[i] <= -treshold) {
                 countNeg++;
             } else if (countNeg){
-                //chack if peak is long enough
+                //check if peak is long enough
                 if((time[i] - time[i - countNeg]) >= peakTime){
                     peakCountNeg++;
                 }
@@ -40,14 +42,6 @@ int peakCount(float *time, float *data, float dataSize, float treshold, float tr
     return peakCountPos + peakCountNeg;
 }
 
-float average(float *data, int dataSize){
-    float sum = 0;
-    int i;
-    for(i = 0; i < dataSize; i++){
-        sum += data[i];
-    }
-    return (sum / dataSize);
-}
 
 int peakCountMargin(float *time, float *ax, float *ay, float *az, int dataSize, char peakAxis, float treshold, float errorMargin, float peakTime){
     float *testAxis;
@@ -79,9 +73,9 @@ int peakCountMargin(float *time, float *ax, float *ay, float *az, int dataSize, 
     float axis1Avg = average(axis1, dataSize);
     float axis2Avg = average(axis2, dataSize);
 
-    //Check if other axises are in error Margin
+    //Check if other axis values are in error Margin
     if (!peakCount(time, axis1, dataSize, errorMargin, axis1Avg, 0, 0) && !peakCount(time, axis2, axis2Avg, dataSize, errorMargin, 0, 0)){
-        //Calkulate peak count for desired axis
+        //Calculate peak count for desired axis
         return peakCount(time, testAxis, dataSize, treshold, 0, 1, 0);
     }
     return -1;
@@ -94,3 +88,25 @@ void clearData(float *data, int size){
     }
 }
 
+float average(float *data, int dataSize){
+    float sum = 0;
+    int i;
+    for(i = 0; i < dataSize; i++){
+        sum += *(data + i);
+    }
+    return (sum / dataSize);
+}
+
+void movavg(float *array, uint8_t array_size, uint8_t window_size, float *output){
+    uint8_t new_array_size = array_size - window_size + 1;
+    float sum = 0;
+    int i;
+    for (i = 0; i < array_size; i++){
+
+        sum += array[i];
+        if (i >= window_size){
+            sum -= array[i - window_size];
+        }
+        output[i] = sum / window_size;
+    }
+}

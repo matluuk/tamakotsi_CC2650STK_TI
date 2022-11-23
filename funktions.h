@@ -10,11 +10,14 @@
 #ifndef FUNKTIONS_H_
 #define FUNKTIONS_H_
 
-//prototypes for funktions.
-void clearData(float*data, int size);
-int peakCount(float *time, float *data, float dataSize, float treshold, int direction, float peakTime);
+#include <inttypes.h>
 
+//prototypes for funktions.
+int peakCount(float *time, float *data, float dataSize, float treshold, int direction, float peakTime);
 int peakCountMargin(float *time, float *ax, float *ay, float *az, int dataSize, char peakAxis, float treshold, float errorMargin, float peakTime);
+void clearData(float*data, int size);
+float average(float *data, int dataSize);
+void movavg(float *array, uint8_t array_size, uint8_t window_size, float *output);
 
 
 
