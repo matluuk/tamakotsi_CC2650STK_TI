@@ -128,7 +128,7 @@ PIN_Config buzzerConfig[] = {
   PIN_TERMINATE
 };
 
-uint_t pinValue_0 = 1; //green LED pinValue
+uint_t pinValue_0 = 0; //green LED pinValue
 uint_t pinValue_1 = 0; //red LED pinValue
 
 // MPU9250-pin settings
@@ -176,6 +176,7 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
             case PLAY_GAME:
                 PIN_setOutputValue( led0Handle, Board_LED0, 1 );
                 PIN_setOutputValue( led1Handle, Board_LED1, 0 );
+                pinValue_0 = 1;
                 programState = MUSIC;
                 nextState = GAME;
                 System_printf("Push button0 when green led is on.\nPush button1 when red led is on.\n");
