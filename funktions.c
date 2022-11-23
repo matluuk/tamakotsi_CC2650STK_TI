@@ -16,7 +16,7 @@ int peakCount(float *time, float *data, float dataSize, float treshold, float tr
     for (i = 0; i < dataSize; i++ ){
         if (direction >= 0){
             //This is for positive peaks
-            if (data[i] - tresholdOffset >= treshold) {
+            if ((data[i] - tresholdOffset) >= treshold) {
                 countPos++;
             } else if (countPos){
                 //check if peak is long enough
@@ -28,7 +28,7 @@ int peakCount(float *time, float *data, float dataSize, float treshold, float tr
         }
         if (direction <= 0){
             //this is for negative peaks
-            if (data[i] <= -treshold) {
+            if ((data[i] - tresholdOffset) >= treshold) {
                 countNeg++;
             } else if (countNeg){
                 //check if peak is long enough
@@ -43,42 +43,25 @@ int peakCount(float *time, float *data, float dataSize, float treshold, float tr
 }
 
 
-int peakCountMargin(float *time, float *ax, float *ay, float *az, int dataSize, char peakAxis, float treshold, float errorMargin, float peakTime){
-    float *testAxis;
-    float *axis1;
-    float *axis2;
-    switch (peakAxis)
-    {
-    case 'x':
-        testAxis = ax;
-        axis1 = ay;
-        axis2 = az;
-        break;
-    case 'y':
-        testAxis = ay;
-        axis1 = ax;
-        axis2 = az;
-        break;
-    case 'z':
-        testAxis = az;
-        axis1 = ax;
-        axis2 = ay;
-        break;
-    default:
-        //printf("invalid peakAxis. Only (x, y, z) are allowed.");
-        return -2;
-    }
-
+int peakCountMargin(float *time, float *testAxis, float *errorAxis1, float *errorAxis2, int dataSize, float treshold, float peakTime, float errorMargin, float errorTime){
+    int result = -1;
     //Calculate averages
-    float axis1Avg = average(axis1, dataSize);
-    float axis2Avg = average(axis2, dataSize);
+    float testAxisAvg = average(*testAxis, dataSize);
+    float errorAxis1Avg = average(*errorAxis1, dataSize);
+    float errorAxis2Avg = average(*errorAxis2, dataSize);
+
 
     //Check if other axis values are in error Margin
-    if (!peakCount(time, axis1, dataSize, errorMargin, axis1Avg, 0, 0) && !peakCount(time, axis2, axis2Avg, dataSize, errorMargin, 0, 0)){
-        //Calculate peak count for desired axis
-        return peakCount(time, testAxis, dataSize, treshold, 0, 1, 0);
+    if (peakCount(time, errorAxis1, dataSize, errorMargin, errorAxis1Avg, 0, errorTime) != 0){
+        result = -1;
     }
-    return -1;
+    else if (peakCount(time, errorAxis2, dataSize, errorMargin, errorAxis2Avg, 0, errorTime) != 0){
+        result = -2;
+    } else {
+        //Calculate peak count for desired axis
+        result = peakCount(time, testAxis, dataSize, treshold, testAxisAvg, 1, peakTime);
+    }
+    return result;
 }
 
 void clearData(float *data, int size){
