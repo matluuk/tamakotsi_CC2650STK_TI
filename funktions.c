@@ -27,7 +27,7 @@ int peakCount(float *time, float *data, float dataSize, float treshold, float tr
             }
         }
         if (direction <= 0){
-            //This is for negative peaks
+            //this is for negative peaks
             if (data[i] <= -treshold) {
                 countNeg++;
             } else if (countNeg){
