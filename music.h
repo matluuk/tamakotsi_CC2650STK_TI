@@ -48,6 +48,9 @@ static int gamePointMusic[] = {
 static int gameEndMusic[] = {
                    415, 16, 400, 16, 380, 16 ,230, 32, 230, 32, 230,23, 190, 2, -1
 };
+static int lowFeaturesMusic[] = {
+                   600, 4, 600, 4, 600, 4, -1
+};
 static int menuMusic[] = {560, 16, 530, 16, 760, 16 ,870, 32, 230, 32, 340,23, 1000, 2, -1
 };
 

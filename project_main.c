@@ -64,6 +64,7 @@ int uartBufferSize = 80;
 char uartBuffer[80];
 char uartMsg[80];
 int getPoint = 0;
+int totalPoints = 0;
 
 //Data for move detection
 int dataIndex;
@@ -128,8 +129,8 @@ PIN_Config buzzerConfig[] = {
   PIN_TERMINATE
 };
 
-uint_t pinValue_0 = 0;
-uint_t pinValue_1 = 0;
+uint_t pinValue_0 = 1; //green LED pinValue
+uint_t pinValue_1 = 0; //red LED pinValue
 
 // MPU9250-pin settings
 /*
@@ -155,7 +156,7 @@ static const I2CCC26XX_I2CPinCfg i2cMPUCfg = {
  * MOVE:
  * stop move detection
  * GAME:
- * when green led is on, player have to push button0 to get point
+ * when green LED is on, player have to push button0 to get point
  */
 void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
 
@@ -207,9 +208,10 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
                 programState = MUSIC;
                 nextState = GAME;
                 music = gamePointMusic;
-                sprintf(msg, "You get a point! pinValue_0 : %d\n", pinValue_1);
+                sprintf(msg, "You get a point! pinValue_0 : %d\n", pinValue_0);
                 System_printf(msg);
                 getPoint = getPoint + 1;
+                totalPoints = totalPoints + 1;
             }
         }
         else {
@@ -225,7 +227,7 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId) {
  * MENU:
  * roll menu with this button
  * GAME:
- * when green led is on, player have to push button1 to get point
+ * when red LED is on, player have to push button1 to get point
  *
  */
 
@@ -252,7 +254,7 @@ void button1Fxn(PIN_Handle handle, PIN_Id pinId) {
                 System_printf("b0: listen music\nb1: next state\n---\n");
                 sprintf(uartMsg, "MSG1:MENU: Listen music");
                 uartState = SEND_MSG;
-                //vain punainen led p��lle
+                //only green LED on
                 PIN_setOutputValue( led0Handle, Board_LED0, 1 );
                 PIN_setOutputValue( led1Handle, Board_LED1, 0 );
                 programState = MUSIC;
@@ -265,7 +267,7 @@ void button1Fxn(PIN_Handle handle, PIN_Id pinId) {
                 System_printf("b0: Move your tamagotchi\nb1: next state\n---\n");
                 sprintf(uartMsg, "MSG1:MENU: Move your tamagotchi");
                 uartState = SEND_MSG;
-                //vain vihre� led p��lle
+                //only red LED on
                 PIN_setOutputValue( led0Handle, Board_LED0, 0 );
                 PIN_setOutputValue( led1Handle, Board_LED1, 1 );
                 programState = MUSIC;
@@ -286,6 +288,7 @@ void button1Fxn(PIN_Handle handle, PIN_Id pinId) {
                 sprintf(msg, "You get a point! pinValue_0 : %d\n", pinValue_1);
                 System_printf(msg);
                 getPoint = getPoint + 1;
+                totalPoints = totalPoints + 1;
             }
         }
         else {
@@ -299,13 +302,6 @@ void button1Fxn(PIN_Handle handle, PIN_Id pinId) {
 }
 
 
-/*
-Void mpuFxn(PIN_Handle mpuHandle, PIN_Id pinId) {
-      System_printf("MpuFxn");
-      System_flush();
-}
-*/
-
 static void uartFxn(UART_Handle uart, void *rxBuf, size_t len) {
     /*
     System_printf("uartFxn!\n");
@@ -313,12 +309,12 @@ static void uartFxn(UART_Handle uart, void *rxBuf, size_t len) {
     */
     uartState = MSG_RECEIVED;
 
-    // K�sittelij�n viimeisen� asiana siirryt��n odottamaan uutta keskeytyst�..
+
     UART_read(uart, rxBuf, uartBufferSize);
 }
 
 Void clkFxn(UArg arg0) {
-    clockTicks = Clock_getTicks(); //tallentaa ajan k�ynnistyksest�.
+    clockTicks = Clock_getTicks(); //saves time from start
 }
 
 /* Task Functions */
@@ -335,32 +331,49 @@ static void uartTaskFxn(UArg arg0, UArg arg1) {
     uartParams.writeDataMode = UART_DATA_TEXT;
     uartParams.readDataMode = UART_DATA_TEXT;
     uartParams.readEcho = UART_ECHO_OFF;
-    uartParams.readMode = UART_MODE_CALLBACK; // Keskeytyspohjainen vastaanotto
-    uartParams.readCallback  = &uartFxn; // K�sittelij�funktio
-    uartParams.baudRate = 9600; // nopeus 9600baud
+    uartParams.readMode = UART_MODE_CALLBACK;
+    uartParams.readCallback  = &uartFxn;
+    uartParams.baudRate = 9600; // speed 9600baud
     uartParams.dataLength = UART_LEN_8; // 8
     uartParams.parityType = UART_PAR_NONE; // n
     uartParams.stopBits = UART_STOP_ONE; // 1
 
-    // Avataan yhteys laitteen sarjaporttiin vakiossa Board_UART0
     uart = UART_open(Board_UART0, &uartParams);
     if (uart == NULL) {
         System_abort("Error opening the UART");
     }
 
-    //k�ynnist�� datan vastaanottamisen
     UART_read(uart, &uartBuffer, uartBufferSize);
 
     while (1) {
         if(uartState == MSG_RECEIVED){
             uartState = WAITING;
-            sprintf(msg, "Uartmsg: %s\n", uartBuffer);
+            //sprintf(msg, "Uartmsg: %s\n", uartBuffer);
+
+            const char sep[] = ":";
+            char *token;
+            token = strtok(uartBuffer, sep);
+
+            sprintf(msg, "token: %s\n", token);
+            System_printf(msg);
+            System_flush();
+
+            if (strcmp(token, "2064,BEEP") == 0) {
+                //System_printf("beepTest\n");
+                //System_flush();
+                if (programState != MUSIC) {
+                    nextState = programState;
+                    programState = MUSIC;
+                }
+                music = lowFeaturesMusic;
+            }
+
             //System_printf(msg);
             //System_flush();
 
             //send message back, for testing
-            sprintf(uartMsg, "%s", uartBuffer);
-            uartState = SEND_MSG;
+            //sprintf(uartMsg, "%s", uartBuffer);
+            //uartState = SEND_MSG;
         } else if (uartState == SEND_MSG){
             uartState = WAITING;
             sprintf(msg, "id:2064,%s\0", uartMsg);
@@ -435,30 +448,12 @@ Void sensorTaskFxn(UArg arg0, UArg arg1) {
       System_abort("Error Initializing I2C\n");
     }
 
-    // JTKJ: Tehtävä 2. Alusta sensorin OPT3001 setup-funktiolla
-    //       Laita enne funktiokutsua eteen 100ms viive (Task_sleep)
-    // JTKJ: Exercise 2. Setup the OPT3001 sensor for use
-    //       Before calling the setup function, insertt 100ms delay with Task_sleep
+
     Task_sleep(1000 / Clock_tickPeriod);
     opt3001_setup(&i2c);
     I2C_close(i2c);
 
     while (1) {
-
-        // JTKJ: Tehtävä 2. Lue sensorilta dataa ja tulosta se Debug-ikkunaan merkkijonona
-        // JTKJ: Exercise 2. Read sensor data and print it to the Debug window as string
-
-        /*
-        sprintf(msg,"valoisuus: %.2f luxia\n",valoisuus);
-        System_printf(msg);
-        System_flush();
-        */
-
-        // JTKJ: Tehtävä 3. Tallenna mittausarvo globaaliin muuttujaan
-        //       Muista tilamuutos
-        // JTKJ: Exercise 3. Save the sensor value into the global variable
-        //       Remember to modify state
-
 
         if ((clockTicks - lastTimeTicks) * Clock_tickPeriod < 4000000 ){
             //open i2c
@@ -545,7 +540,6 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
     int endBlinks = 0;
 
 
-
     //green led is on at start
     System_printf("b0: Move your tamagotchi\nb1: next state\n---\n");
     PIN_setOutputValue( led0Handle, Board_LED0, 1 );
@@ -573,6 +567,8 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
                 }
                 getPoint = 0;
                 gameStartTicks = clockTicks;
+                sprintf(uartMsg, "MSG2:Points: %d", totalPoints);
+                uartState = SEND_MSG;
             }
         } else if (programState == GAME_END) {
             //Both LEDs blinks 5 times.
@@ -591,11 +587,24 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
                 PIN_setOutputValue( led1Handle, Board_LED1, pinValue_1 );
                 gameStartTicks = clockTicks;
                 if (endBlinks >= 10) {
+                    if (totalPoints >= 1 && totalPoints < 6) {
+                        sprintf(uartMsg, "ACTIVATE:1;1;1");
+                        uartState = SEND_MSG;
+                    }
+                    else if (totalPoints >= 6 && totalPoints < 10) {
+                        sprintf(uartMsg, "ACTIVATE:2;2;2");
+                        uartState = SEND_MSG;
+                    }
+                    else if (totalPoints >= 10 && totalPoints < 20) {
+                        sprintf(uartMsg, "ACTIVATE:3;3;3");
+                        uartState = SEND_MSG;
+                    }
                     PIN_setOutputValue( led0Handle, Board_LED0, 1 );
                     PIN_setOutputValue( led1Handle, Board_LED1, 1 );
                     blinkAccelator = 1;
                     endBlinks = 0;
                     getPoint = 0;
+                    totalPoints = 0;
                     programState = MUSIC;
                     nextState = MENU;
                     music = gameEndMusic;
@@ -654,7 +663,7 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
 
             clearAllData();
             //send message
-            sprintf(uartMsg, "session:end,EAT:8,EXERCISE:1");
+            sprintf(uartMsg, "session:end");
             uartState = SEND_MSG;
             programState = MUSIC;
             nextState = MENU;
