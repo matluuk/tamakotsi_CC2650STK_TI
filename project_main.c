@@ -57,7 +57,7 @@ enum state
     MENU = 1,
     DATA_READY,
     MUSIC,
-    SEND_DATA,
+    SEND_DATATODEBUG,
     MOVE_DETECTION,
     MOVE_DETECTION_ALGORITHM,
     GAME,
@@ -67,7 +67,8 @@ enum stateUart
 {
     WAITING = 1,
     MSG_RECEIVED,
-    SEND_MSG
+    SEND_MSG,
+    SEND_DATA
 };
 enum stateMenu
 {
@@ -370,6 +371,7 @@ static void uartTaskFxn(UArg arg0, UArg arg1)
 {
 
     char msg[85];
+    int i;
 
     // UART-library settings
     UART_Handle uart;
@@ -397,8 +399,9 @@ static void uartTaskFxn(UArg arg0, UArg arg1)
 
     while (1)
     {
-        if (uartState == MSG_RECEIVED)
+        switch (uartState)
         {
+        case MSG_RECEIVED:
             uartState = WAITING;
             // sprintf(msg, "Uartmsg: %s\n", uartBuffer);
 
@@ -418,15 +421,9 @@ static void uartTaskFxn(UArg arg0, UArg arg1)
                 music = lowFeaturesMusic;
             }
 
-            // System_printf(msg);
-            // System_flush();
+            break;
 
-            // send message back, for testing
-            // sprintf(uartMsg, "%s", uartBuffer);
-            // uartState = SEND_MSG;
-        }
-        else if (uartState == SEND_MSG)
-        {
+        case SEND_MSG:
             if (uartMsg[0] == '\0') {
                 sprintf(msg, "id:2064,MSG1:%s,MSG2:%s\0",msgOne,msgTwo);
             } else {
@@ -435,13 +432,25 @@ static void uartTaskFxn(UArg arg0, UArg arg1)
             }
             UART_write(uart, msg, strlen(msg) + 1);
             uartState = WAITING;
-            /*
-            System_printf("Sendmsg:\n");
-            System_printf(msg);
-            System_printf("\n");
-            System_flush();
-            */
+            break;
+
+        case SEND_DATA:
+            // sends data currently not in use
+            for (i = 0; i < dataSize; i++)
+            {
+                sprintf(msg, "id:2064,time:%.3f,ax:%.3f,ay:%.3f,az:%.3f,gx:%.3f,gy:%.3f,gz:%.3f",
+                        (dataTime[i] - dataTime[0]),
+                        dataAx[i],
+                        dataAy[i],
+                        dataAz[i],
+                        dataGx[i],
+                        dataGy[i],
+                        dataGz[i]);
+                UART_write(uart, msg, strlen(msg) + 1);
+            }
+            break;
         }
+        uartState = WAITING;
 
         // Just for sanity check for exercise, you can comment this out
         // System_printf("uartTask\n");
@@ -599,20 +608,24 @@ Void sensorTaskFxn(UArg arg0, UArg arg1)
 Void mainTaskFxn(UArg arg0, UArg arg1)
 {
     // Variables
+    int eatPoints;
+    int petPoints;
+    int exercicePoints;
+
     char msg[30];
     int blinkAccelator = 1;
     int endBlinks = 0;
     float peakTreshold = 0.15;
-    float peakTime = 100;
-    float errorMargin = 0.1;
-    float errorTime = 80;
+    float peakTime = 120;
+    float errorMargin = 0.12;
+    float errorTime = 100;
     int peaks = 0;
 
     //variables for movement detection algorithm
     int moveAvgWindowSize = 3;
-    float avgAx;
-    float avgAy;
-    float avgAz;
+    float avgAx = 0;
+    float avgAy = 0;
+    float avgAz = 0;
 
     // green led is on at start
     System_printf("b0: Move your tamagotchi\nb1: next state\n---\n");
@@ -629,9 +642,9 @@ Void mainTaskFxn(UArg arg0, UArg arg1)
 
             if (music == hedwigsThemeMusic)
             {
-               int eatPoints = 2;
-               int petPoints = 2;
-               int exercicePoints = 4;
+               eatPoints = 2;
+               petPoints = 2;
+               exercicePoints = 4;
 
                if (brightnessState == BRIGHT)
                {
@@ -691,9 +704,9 @@ Void mainTaskFxn(UArg arg0, UArg arg1)
                 PIN_setOutputValue(led1Handle, Board_LED1, pinValue_1);
                 gameStartTicks = clockTicks;
                 if (endBlinks >= 10) {
-                    int eatPoints = 1;
-                    int petPoints = 0;
-                    int exercicePoints = 0;
+                    eatPoints = 1;
+                    petPoints = 0;
+                    exercicePoints = 0;
 
                     if (totalPoints >= 3)
                     {
@@ -736,11 +749,12 @@ Void mainTaskFxn(UArg arg0, UArg arg1)
             break;
 
         case MOVE_DETECTION_ALGORITHM:
-
+            /*
             //Calculate moving averages
             movavg(dataAx, dataSize, moveAvgWindowSize);
             movavg(dataAy, dataSize, moveAvgWindowSize);
             movavg(dataAz, dataSize, moveAvgWindowSize);
+            */
 
             avgAx = average(dataAx, dataSize);
             avgAy = average(dataAy, dataSize);
@@ -754,7 +768,8 @@ Void mainTaskFxn(UArg arg0, UArg arg1)
             System_printf(msg);
             System_flush();
 
-            /*Testing code
+
+            //Testing code
             // display peaks + side
             System_printf("peakCounts without error margin + side:\n");
             peaks = peakCount(dataTime, dataAx, dataSize, peakTreshold, avgAx, 1, peakTime);
@@ -780,20 +795,31 @@ Void mainTaskFxn(UArg arg0, UArg arg1)
             sprintf(msg, "Az: = %d\n", peaks);
             System_printf(msg);
             System_flush();
-            */
+
 
             //movement in x direction
             peaks = peakCountMargin(dataTime, dataAx, dataAy, dataAz, dataSize, peakTreshold, peakTime, errorMargin, errorTime);
-            sprintf(msg, "Ax: = %d\n", peaks);
 
-            if (peaks > 3){
-                //sprintf(msgTwo, "You accelerated Tamacotchi 3 times in x+ direction.");
-                sprintf(uartMsg, "ACTIVATE:3,3,5");
-            }else if (peaks > 1){
-                sprintf(uartMsg, "ACTIVATE:2,2,4");
-            }
+            sprintf(msg, "Ax: = %d\n", peaks);
             System_printf(msg);
             System_flush();
+
+            if (peaks >= 3){
+                eatPoints = 3;
+                petPoints = 3;
+                exercicePoints = 5;
+            }else if (peaks >= 1){
+                eatPoints = 2;
+                petPoints = 2;
+                exercicePoints = 4;
+            } else {
+                eatPoints = 0;
+                petPoints = 0;
+                exercicePoints = 0;
+            }
+            //sprintf(msgTwo, "You accelerated Tamacotchi %d times in x+ direction.", peaks);
+            sprintf(uartMsg, "session:end,ACTIVATE:%d;%d;%d",eatPoints, petPoints, exercicePoints);
+            uartState = SEND_MSG;
 
             clearAllData();
             // send message
@@ -804,7 +830,7 @@ Void mainTaskFxn(UArg arg0, UArg arg1)
             music = menuMusic;
             break;
 
-        case SEND_DATA:
+        case SEND_DATATODEBUG:
             programState = MUSIC;
             nextState = MENU;
             music = backMusic;
