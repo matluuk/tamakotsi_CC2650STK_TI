@@ -684,7 +684,6 @@ Void mainTaskFxn(UArg arg0, UArg arg1)
                     if (brightnessState == BRIGHT){
                         eatPoints = 2;
                     }
-
                     if (totalPoints >= 1 && totalPoints < 6) {
                         petPoints = 1;
                         exercicePoints = 1;
@@ -702,7 +701,6 @@ Void mainTaskFxn(UArg arg0, UArg arg1)
                     sprintf(uartMsg, "ACTIVATE:%d;%d;%d",eatPoints, petPoints, exercicePoints);
                     uartState = SEND_MSG;
 
-                }
 
                     PIN_setOutputValue( led0Handle, Board_LED0, 1 );
                     PIN_setOutputValue( led1Handle, Board_LED1, 1 );
