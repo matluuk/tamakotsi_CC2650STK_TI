@@ -17,7 +17,7 @@ int peakCount(float *time, float *data, float dataSize, float treshold, float tr
 int peakCountMargin(float *time, float *testAxis, float *errorAxis1, float *errorAxis2, int dataSize, float treshold, float peakTime, float errorMargin, float errorTime);
 void clearData(float*data, int size);
 float average(float *data, int dataSize);
-void movavg(float *array, uint8_t array_size, uint8_t window_size, float *output);
+void movavg(float *array, uint8_t array_size, uint8_t window_size);
 
 
 

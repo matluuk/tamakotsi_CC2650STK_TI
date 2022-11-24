@@ -24,17 +24,15 @@ float average(float *data, int dataSize){
     return (sum / dataSize);
 }
 
-void movavg(float *array, uint8_t array_size, uint8_t window_size, float *output){
-    uint8_t new_array_size = array_size - window_size + 1;
+void movavg(float *array, uint8_t array_size, uint8_t window_size){
     float sum = 0;
     int i;
-    for (i = 0; i < array_size; i++){
-
+    for (i = 0;i < array_size; i++){
         sum += array[i];
         if (i >= window_size){
             sum -= array[i - window_size];
         }
-        output[i] = sum / window_size;
+        array[i] = (sum / window_size);
     }
 }
 
