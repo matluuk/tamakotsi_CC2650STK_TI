@@ -31,10 +31,9 @@
 
 
 /*TODOS:
- * MainTask Switch case.
  * Liikkeentunnistus pisteytys, liikkeiden valinta
  * liikkeentunnistus moveavg
- * msg1 ja msg2 vistit katoavat
+ * msg1 ja msg2 viestit katoavat
  * menun tilan ilmoitus ohjelmista palatessa
  * led game: nopeuttaminen
  * Beep: toimaan jos programState = MUSIC Tilamuuttuja beepille?
@@ -77,6 +76,8 @@ char uartBuffer[80];
 char uartMsg[80];
 int getPoint = 0;
 int totalPoints = 0;
+char msgOne[40];
+char msgTwo[40];
 
 //Data for move detection
 int dataIndex;
@@ -250,7 +251,8 @@ void button1Fxn(PIN_Handle handle, PIN_Id pinId) {
         switch(menuState) {
             case MOVE:
                 System_printf("b0: start led-game\nb1: next state\n---\n");
-                sprintf(uartMsg, "MSG1:MENU: LED-game");
+                sprintf(msgOne,"MENU: LED-game");
+                sprintf(uartMsg,"");
                 uartState = SEND_MSG;
                 //Both LEDs on
                 PIN_setOutputValue( led0Handle, Board_LED0, 1 );
@@ -263,7 +265,8 @@ void button1Fxn(PIN_Handle handle, PIN_Id pinId) {
 
             case PLAY_GAME:
                 System_printf("b0: listen music\nb1: next state\n---\n");
-                sprintf(uartMsg, "MSG1:MENU: Listen music");
+                sprintf(msgOne,"MENU: Listen music");
+                sprintf(uartMsg,"");
                 uartState = SEND_MSG;
                 //only green LED on
                 PIN_setOutputValue( led0Handle, Board_LED0, 1 );
@@ -276,7 +279,8 @@ void button1Fxn(PIN_Handle handle, PIN_Id pinId) {
 
             case PLAY_MUSIC:
                 System_printf("b0: Move your tamagotchi\nb1: next state\n---\n");
-                sprintf(uartMsg, "MSG1:MENU: Move your tamagotchi");
+                sprintf(msgOne, "MENU: Move your tamagotchi");
+                sprintf(uartMsg,"");
                 uartState = SEND_MSG;
                 //only red LED on
                 PIN_setOutputValue( led0Handle, Board_LED0, 0 );
@@ -382,9 +386,15 @@ static void uartTaskFxn(UArg arg0, UArg arg1) {
             //sprintf(uartMsg, "%s", uartBuffer);
             //uartState = SEND_MSG;
         } else if (uartState == SEND_MSG){
-            sprintf(msg, "id:2064,%s\0", uartMsg);
-            UART_write(uart, msg, strlen(msg) + 1);
-            uartState = WAITING;
+            if (uartMsg[0] == '\0') {
+                sprintf(msg, "id:2064,MSG1:%s,MSG2:%s\0",msgOne,msgTwo);
+                UART_write(uart, msg, strlen(msg) + 1);
+                uartState = WAITING;
+            } else {
+                sprintf(msg, "id:2064,MSG1:%s,MSG2:%s,%s\0",msgOne,msgTwo,uartMsg);
+                UART_write(uart, msg, strlen(msg) + 1);
+                uartState = WAITING;
+            }
             /*
             System_printf("Sendmsg:\n");
             System_printf(msg);
@@ -590,7 +600,7 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
                     }
                     getPoint = 0;
                     gameStartTicks = clockTicks;
-                    sprintf(uartMsg, "MSG2:Points: %d", totalPoints);
+                    sprintf(msgTwo, "Points: %d", totalPoints);
                     uartState = SEND_MSG;
                 }
                 break;
@@ -626,6 +636,7 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
                         }
                         PIN_setOutputValue( led0Handle, Board_LED0, 1 );
                         PIN_setOutputValue( led1Handle, Board_LED1, 1 );
+                        sprintf(msgTwo,"");
                         blinkAccelator = 1;
                         endBlinks = 0;
                         getPoint = 0;
