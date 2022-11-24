@@ -82,7 +82,6 @@ Uint32 mpuStartTicks = 0;
 Uint32 gameStartTicks = 0;
 Uint32 lastTimeTicks = 0;
 
-
 // RTOS pin handles
 static PIN_Handle button0Handle;
 static PIN_State button0State;
@@ -100,7 +99,6 @@ static PIN_Handle mpuHandle;
 // RTOS:n clockvariables
 Clock_Handle clkHandle;
 Clock_Params clkParams;
-
 
 
 PIN_Config button0Config[] = {
@@ -236,7 +234,7 @@ void button1Fxn(PIN_Handle handle, PIN_Id pinId) {
     System_flush();
 
     if(programState == MENU) {
-        switch(menuState){
+        switch(menuState) {
             case MOVE:
                 System_printf("b0: start led-game\nb1: next state\n---\n");
                 sprintf(uartMsg, "MSG1:MENU: LED-game");
@@ -354,10 +352,6 @@ static void uartTaskFxn(UArg arg0, UArg arg1) {
             char *token;
             token = strtok(uartBuffer, sep);
 
-            sprintf(msg, "token: %s\n", token);
-            System_printf(msg);
-            System_flush();
-
             if (strcmp(token, "2064,BEEP") == 0) {
                 //System_printf("beepTest\n");
                 //System_flush();
@@ -400,7 +394,7 @@ Void sensorTaskFxn(UArg arg0, UArg arg1) {
     I2C_Params      i2cParams;
     I2C_Handle i2cMPU; // Own i2c-interface for MPU9250 sensor
     I2C_Params i2cMPUParams;
-    char msg[30];
+    //char msg[30];
     lastTimeTicks = 0;
 
 
@@ -537,150 +531,158 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
     char msg[30];
     int blinkAccelator = 1;
     int endBlinks = 0;
+    float peakTreshold = 0.15;
+    float peakTime = 100;
+    float errorMargin = 0.1;
+    float errorTime = 80;
+    int peaks = 0;
 
+    float avgAx = average(dataAx, dataSize);
+    float avgAy = average(dataAy, dataSize);
+    float avgAz = average(dataAz, dataSize);
 
     //green led is on at start
     System_printf("b0: Move your tamagotchi\nb1: next state\n---\n");
     PIN_setOutputValue( led0Handle, Board_LED0, 1 );
 
-
     while (1){
-        if(programState == MUSIC) {
-            //System_printf("Playing music.\n");
-            //System_flush();
-            playMusic(buzzerHandle, music, 144);
-            programState = nextState;
-        } else if (programState == GAME) {
-            if ((clockTicks - gameStartTicks) * Clock_tickPeriod / 1000 > 2000 - blinkAccelator) {
-                //System_printf("led changes/n");
+        switch(programState) {
+            case MUSIC:
+                //System_printf("Playing music.\n");
                 //System_flush();
-                pinValue_0 = PIN_getOutputValue( Board_LED0 );
-                pinValue_0 = !pinValue_0;
-                PIN_setOutputValue( led0Handle, Board_LED0, pinValue_0 );
-                pinValue_1 = PIN_getOutputValue( Board_LED1 );
-                pinValue_1 = !pinValue_1;
-                PIN_setOutputValue( led1Handle, Board_LED1, pinValue_1 );
+                playMusic(buzzerHandle, music, 144);
+                programState = nextState;
+                break;
 
-                if (blinkAccelator < 1800) {
-                    blinkAccelator = blinkAccelator + 100;
-                }
-                getPoint = 0;
-                gameStartTicks = clockTicks;
-                sprintf(uartMsg, "MSG2:Points: %d", totalPoints);
-                uartState = SEND_MSG;
-            }
-        } else if (programState == GAME_END) {
-            //Both LEDs blinks 5 times.
-            if ((clockTicks - gameStartTicks) * Clock_tickPeriod / 1000 > 50) {
-                if (endBlinks == 0) {
-                    pinValue_0 = 1;
-                    pinValue_1 = 1;
-                    endBlinks = endBlinks + 1;
-                }
-                else if (endBlinks > 0 && endBlinks < 10) {
-                    pinValue_1 = !pinValue_1;
+            case GAME:
+                if ((clockTicks - gameStartTicks) * Clock_tickPeriod / 1000 > 2000 - blinkAccelator) {
+                    //System_printf("led changes/n");
+                    //System_flush();
+                    pinValue_0 = PIN_getOutputValue( Board_LED0 );
                     pinValue_0 = !pinValue_0;
-                    endBlinks = endBlinks + 1;
-                }
-                PIN_setOutputValue( led0Handle, Board_LED0, pinValue_1 );
-                PIN_setOutputValue( led1Handle, Board_LED1, pinValue_1 );
-                gameStartTicks = clockTicks;
-                if (endBlinks >= 10) {
-                    if (totalPoints >= 1 && totalPoints < 6) {
-                        sprintf(uartMsg, "ACTIVATE:1;1;1");
-                        uartState = SEND_MSG;
+                    PIN_setOutputValue( led0Handle, Board_LED0, pinValue_0 );
+                    pinValue_1 = PIN_getOutputValue( Board_LED1 );
+                    pinValue_1 = !pinValue_1;
+                    PIN_setOutputValue( led1Handle, Board_LED1, pinValue_1 );
+
+                    if (blinkAccelator < 1800) {
+                        blinkAccelator = blinkAccelator + 150;
                     }
-                    else if (totalPoints >= 6 && totalPoints < 10) {
-                        sprintf(uartMsg, "ACTIVATE:2;2;2");
-                        uartState = SEND_MSG;
-                    }
-                    else if (totalPoints >= 10 && totalPoints < 20) {
-                        sprintf(uartMsg, "ACTIVATE:3;3;3");
-                        uartState = SEND_MSG;
-                    }
-                    PIN_setOutputValue( led0Handle, Board_LED0, 1 );
-                    PIN_setOutputValue( led1Handle, Board_LED1, 1 );
-                    blinkAccelator = 1;
-                    endBlinks = 0;
                     getPoint = 0;
-                    totalPoints = 0;
-                    programState = MUSIC;
-                    nextState = MENU;
-                    music = gameEndMusic;
+                    gameStartTicks = clockTicks;
+                    sprintf(uartMsg, "MSG2:Points: %d", totalPoints);
+                    uartState = SEND_MSG;
                 }
+                break;
+
+            case GAME_END:
+                //Both LEDs blinks 5 times.
+                if ((clockTicks - gameStartTicks) * Clock_tickPeriod / 1000 > 50) {
+                    if (endBlinks == 0) {
+                        pinValue_0 = 1;
+                        pinValue_1 = 1;
+                        endBlinks = endBlinks + 1;
+                    }
+                    else if (endBlinks > 0 && endBlinks < 10) {
+                        pinValue_1 = !pinValue_1;
+                        pinValue_0 = !pinValue_0;
+                        endBlinks = endBlinks + 1;
+                    }
+                    PIN_setOutputValue( led0Handle, Board_LED0, pinValue_1 );
+                    PIN_setOutputValue( led1Handle, Board_LED1, pinValue_1 );
+                    gameStartTicks = clockTicks;
+                    if (endBlinks >= 10) {
+                        if (totalPoints >= 1 && totalPoints < 6) {
+                            sprintf(uartMsg, "ACTIVATE:1;1;1");
+                            uartState = SEND_MSG;
+                        }
+                        else if (totalPoints >= 6 && totalPoints < 10) {
+                            sprintf(uartMsg, "ACTIVATE:2;2;2");
+                            uartState = SEND_MSG;
+                        }
+                        else if (totalPoints >= 10 && totalPoints < 20) {
+                            sprintf(uartMsg, "ACTIVATE:3;3;3");
+                            uartState = SEND_MSG;
+                        }
+                        PIN_setOutputValue( led0Handle, Board_LED0, 1 );
+                        PIN_setOutputValue( led1Handle, Board_LED1, 1 );
+                        blinkAccelator = 1;
+                        endBlinks = 0;
+                        getPoint = 0;
+                        totalPoints = 0;
+                        programState = MUSIC;
+                        nextState = MENU;
+                        music = gameEndMusic;
+                    }
+                }
+                break;
+
+            case MOVE_DETECTION_ALGORITHM:
+
+                sprintf(msg, "avgAx: %.2f\n", avgAx);
+                System_printf(msg);
+                sprintf(msg, "avgAy: %.2f\n", avgAy);
+                System_printf(msg);
+                sprintf(msg, "avgAz: %.2f\n", avgAz);
+                System_printf(msg);
+                System_flush();
+
+                //display peaks + side
+                System_printf("peakCounts without error margin + side:\n");
+                peaks = peakCount(dataTime, dataAx, dataSize, peakTreshold, avgAx, 1, peakTime);
+                sprintf(msg, "Ax: = %d\n", peaks);
+                System_printf(msg);
+                peaks = peakCount(dataTime, dataAy, dataSize, peakTreshold, avgAy, 1, peakTime);
+                sprintf(msg, "Ay: = %d\n", peaks);
+                System_printf(msg);
+                peaks = peakCount(dataTime, dataAz, dataSize, peakTreshold, avgAz, 1, peakTime);
+                sprintf(msg, "Az: = %d\n", peaks);
+                System_printf(msg);
+                System_flush();
+
+                //display peaks - side
+                System_printf("peakCounts with error margin + side:\n");
+                peaks = peakCountMargin(dataTime, dataAx, dataAy, dataAz, dataSize, peakTreshold, peakTime, errorMargin, errorTime);
+                sprintf(msg, "Ax: = %d\n", peaks);
+                System_printf(msg);
+                peaks = peakCountMargin(dataTime, dataAy, dataAx, dataAz, dataSize, peakTreshold, peakTime, errorMargin, errorTime);
+                sprintf(msg, "Ay: = %d\n", peaks);
+                System_printf(msg);
+                peaks = peakCountMargin(dataTime, dataAz, dataAx, dataAy, dataSize, peakTreshold, peakTime, errorMargin, errorTime);
+                sprintf(msg, "Az: = %d\n", peaks);
+                System_printf(msg);
+                System_flush();
+
+                /*
+                if (peaks < 0){
+                    sprintf(msg, "peakCount with error margin = Error margin srikes: %d\n", peaks);
+                }else{
+                    sprintf(msg, "peakCount with error margin = %d\n", peaks);
+                }
+                System_printf(msg);
+                System_flush();
+                */
+
+                clearAllData();
+                //send message
+                sprintf(uartMsg, "session:end");
+                uartState = SEND_MSG;
+                programState = MUSIC;
+                nextState = MENU;
+                music = menuMusic;
+                break;
+
+            case SEND_DATA:
+                programState = MUSIC;
+                nextState = MENU;
+                music = backMusic;
+                sendData();
+                System_printf("data sent.");
+                break;
             }
-        } else if (programState == MOVE_DETECTION_ALGORITHM) {
-
-            float peakTreshold = 0.15;
-            float peakTime = 100;
-            float errorMargin = 0.1;
-            float errorTime = 80;
-            int peaks = 0;
-
-            float avgAx = average(dataAx, dataSize);
-            float avgAy = average(dataAy, dataSize);
-            float avgAz = average(dataAz, dataSize);
-            sprintf(msg, "avgAx: %.2f\n", avgAx);
-            System_printf(msg);
-            sprintf(msg, "avgAy: %.2f\n", avgAy);
-            System_printf(msg);
-            sprintf(msg, "avgAz: %.2f\n", avgAz);
-            System_printf(msg);
             System_flush();
-
-            //display peaks + side
-            System_printf("peakCounts without error margin + side:\n");
-            peaks = peakCount(dataTime, dataAx, dataSize, peakTreshold, avgAx, 1, peakTime);
-            sprintf(msg, "Ax: = %d\n", peaks);
-            System_printf(msg);
-            peaks = peakCount(dataTime, dataAy, dataSize, peakTreshold, avgAy, 1, peakTime);
-            sprintf(msg, "Ay: = %d\n", peaks);
-            System_printf(msg);
-            peaks = peakCount(dataTime, dataAz, dataSize, peakTreshold, avgAz, 1, peakTime);
-            sprintf(msg, "Az: = %d\n", peaks);
-            System_printf(msg);
-            System_flush();
-
-            //display peaks - side
-            System_printf("peakCounts with error margin + side:\n");
-            peaks = peakCountMargin(dataTime, dataAx, dataAy, dataAz, dataSize, peakTreshold, peakTime, errorMargin, errorTime);
-            sprintf(msg, "Ax: = %d\n", peaks);
-            System_printf(msg);
-            peaks = peakCountMargin(dataTime, dataAy, dataAx, dataAz, dataSize, peakTreshold, peakTime, errorMargin, errorTime);
-            sprintf(msg, "Ay: = %d\n", peaks);
-            System_printf(msg);
-            peaks = peakCountMargin(dataTime, dataAz, dataAx, dataAy, dataSize, peakTreshold, peakTime, errorMargin, errorTime);
-            sprintf(msg, "Az: = %d\n", peaks);
-            System_printf(msg);
-            System_flush();
-
-            /*
-            if (peaks < 0){
-                sprintf(msg, "peakCount with error margin = Error margin srikes: %d\n", peaks);
-            }else{
-                sprintf(msg, "peakCount with error margin = %d\n", peaks);
-            }
-            System_printf(msg);
-            System_flush();
-            */
-
-            clearAllData();
-            //send message
-            sprintf(uartMsg, "session:end");
-            uartState = SEND_MSG;
-            programState = MUSIC;
-            nextState = MENU;
-            music = menuMusic;
-        } else if(programState == SEND_DATA){
-            programState = MUSIC;
-            nextState = MENU;
-            music = backMusic;
-            sendData();
-            System_printf("data sent.");
+            Task_sleep(50000 / Clock_tickPeriod);
         }
-        System_flush();
-        Task_sleep(50000 / Clock_tickPeriod);
-    }
 }
 
 //Own functions
