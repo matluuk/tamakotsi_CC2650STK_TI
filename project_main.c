@@ -598,9 +598,11 @@ Void mainTaskFxn(UArg arg0, UArg arg1)
     float errorTime = 80;
     int peaks = 0;
 
-    float avgAx = average(dataAx, dataSize);
-    float avgAy = average(dataAy, dataSize);
-    float avgAz = average(dataAz, dataSize);
+    //variables for movement detection algorithm
+    int moveAvgWindowSize = 3;
+    float avgAx;
+    float avgAy;
+    float avgAz;
 
     // green led is on at start
     System_printf("b0: Move your tamagotchi\nb1: next state\n---\n");
@@ -699,6 +701,15 @@ Void mainTaskFxn(UArg arg0, UArg arg1)
 
         case MOVE_DETECTION_ALGORITHM:
 
+            //Calculate moving averages
+            movavg(dataAx, dataSize, moveAvgWindowSize);
+            movavg(dataAy, dataSize, moveAvgWindowSize);
+            movavg(dataAz, dataSize, moveAvgWindowSize);
+
+            avgAx = average(dataAx, dataSize);
+            avgAy = average(dataAy, dataSize);
+            avgAz = average(dataAz, dataSize);
+
             sprintf(msg, "avgAx: %.2f\n", avgAx);
             System_printf(msg);
             sprintf(msg, "avgAy: %.2f\n", avgAy);
@@ -707,6 +718,7 @@ Void mainTaskFxn(UArg arg0, UArg arg1)
             System_printf(msg);
             System_flush();
 
+            /*Testing code
             // display peaks + side
             System_printf("peakCounts without error margin + side:\n");
             peaks = peakCount(dataTime, dataAx, dataSize, peakTreshold, avgAx, 1, peakTime);
@@ -732,16 +744,20 @@ Void mainTaskFxn(UArg arg0, UArg arg1)
             sprintf(msg, "Az: = %d\n", peaks);
             System_printf(msg);
             System_flush();
+            */
 
-            /*
-            if (peaks < 0){
-                sprintf(msg, "peakCount with error margin = Error margin srikes: %d\n", peaks);
-            }else{
-                sprintf(msg, "peakCount with error margin = %d\n", peaks);
+            //movement in x direction
+            peaks = peakCountMargin(dataTime, dataAx, dataAy, dataAz, dataSize, peakTreshold, peakTime, errorMargin, errorTime);
+            sprintf(msg, "Ax: = %d\n", peaks);
+
+            if (peaks > 3){
+                //sprintf(msgTwo, "You accelerated Tamacotchi 3 times in x+ direction.");
+                sprintf(uartMsg, "ACTIVATE:3,3,5");
+            }else if (peaks > 1){
+                sprintf(uartMsg, "ACTIVATE:2,2,4");
             }
             System_printf(msg);
             System_flush();
-            */
 
             clearAllData();
             // send message
