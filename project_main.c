@@ -617,9 +617,19 @@ Void mainTaskFxn(UArg arg0, UArg arg1)
 
             if (music == hedwigsThemeMusic)
             {
+               int eatPoints = 2;
+               int petPoints = 2;
+               int exercicePoints = 4;
+
+               if (brightnessState == BRIGHT){
+                   eatPoints = 3;
+                   petPoints =3;
+                   exercicePoints = 5;
+               }
+
                 System_printf("music was Hedwigs Theme.\n");
                 System_flush();
-                sprintf(uartMsg, "ACTIVATE:2,2,4");
+                sprintf(uartMsg, "ACTIVATE:%d;%d;%d",eatPoints, petPoints, exercicePoints);
                 uartState = SEND_MSG;
             }
             programState = nextState;
