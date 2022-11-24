@@ -612,19 +612,6 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
 
                 }
 
-                /*if (totalPoints >= 1 && totalPoints < 6) {
-                        sprintf(uartMsg, "ACTIVATE:1;1;1");
-                        uartState = SEND_MSG;
-                    }
-                    else if (totalPoints >= 6 && totalPoints < 10) {
-                        sprintf(uartMsg, "ACTIVATE:2;2;2");
-                        uartState = SEND_MSG;
-                    }
-                    else if (totalPoints >= 10 && totalPoints < 20) {
-                        sprintf(uartMsg, "ACTIVATE:3;3;3");
-                        uartState = SEND_MSG;
-                    }
-                    */
                     PIN_setOutputValue( led0Handle, Board_LED0, 1 );
                     PIN_setOutputValue( led1Handle, Board_LED1, 1 );
                     blinkAccelator = 1;
