@@ -29,6 +29,19 @@
 #include "music.h"
 #include "funktions.h"
 
+
+/*TODOS:
+ * MainTask Switch case.
+ * Liikkeentunnistus pisteytys, liikkeiden valinta
+ * liikkeentunnistus moveavg
+ * msg1 ja msg2 vistit katoavat
+ * menun tilan ilmoitus ohjelmista palatessa
+ * led game: nopeuttaminen
+ * Beep: toimaan jos programState = MUSIC Tilamuuttuja beepille?
+ * Laite menee sekaisin nopeista button 0 painalluksista
+ * Valoisuus pisteytykseen
+ *  */
+
 /* Prototypes */
 void sendData();
 void playMusic(PIN_Handle buzzerPin, int *note, int tempo);
@@ -548,6 +561,13 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
             //System_printf("Playing music.\n");
             //System_flush();
             playMusic(buzzerHandle, music, 144);
+
+            if (music == hedwigsThemeMusic){
+                System_printf("music was Hedwigs Theme.\n");
+                System_flush();
+                sprintf(uartMsg, "ACTIVATE:2,2,4");
+                uartState = SEND_MSG;
+            }
             programState = nextState;
         } else if (programState == GAME) {
             if ((clockTicks - gameStartTicks) * Clock_tickPeriod / 1000 > 2000 - blinkAccelator) {

@@ -7,6 +7,37 @@
 
 #include <inttypes.h>
 
+
+void clearData(float *data, int size){
+    int i;
+    for (i = 0; i < size; i++){
+        data[i] = 0;
+    }
+}
+
+float average(float *data, int dataSize){
+    float sum = 0;
+    int i;
+    for(i = 0; i < dataSize; i++){
+        sum += *(data + i);
+    }
+    return (sum / dataSize);
+}
+
+void movavg(float *array, uint8_t array_size, uint8_t window_size, float *output){
+    uint8_t new_array_size = array_size - window_size + 1;
+    float sum = 0;
+    int i;
+    for (i = 0; i < array_size; i++){
+
+        sum += array[i];
+        if (i >= window_size){
+            sum -= array[i - window_size];
+        }
+        output[i] = sum / window_size;
+    }
+}
+
 int peakCount(float *time, float *data, float dataSize, float treshold, float tresholdOffset, int direction, float peakTime){
     int countPos = 0;
     int peakCountPos = 0;
@@ -46,9 +77,9 @@ int peakCount(float *time, float *data, float dataSize, float treshold, float tr
 int peakCountMargin(float *time, float *testAxis, float *errorAxis1, float *errorAxis2, int dataSize, float treshold, float peakTime, float errorMargin, float errorTime){
     int result = -1;
     //Calculate averages
-    float testAxisAvg = average(*testAxis, dataSize);
-    float errorAxis1Avg = average(*errorAxis1, dataSize);
-    float errorAxis2Avg = average(*errorAxis2, dataSize);
+    float testAxisAvg = average(testAxis, dataSize);
+    float errorAxis1Avg = average(errorAxis1, dataSize);
+    float errorAxis2Avg = average(errorAxis2, dataSize);
 
 
     //Check if other axis values are in error Margin
@@ -64,32 +95,3 @@ int peakCountMargin(float *time, float *testAxis, float *errorAxis1, float *erro
     return result;
 }
 
-void clearData(float *data, int size){
-    int i;
-    for (i = 0; i < size; i++){
-        data[i] = 0;
-    }
-}
-
-float average(float *data, int dataSize){
-    float sum = 0;
-    int i;
-    for(i = 0; i < dataSize; i++){
-        sum += *(data + i);
-    }
-    return (sum / dataSize);
-}
-
-void movavg(float *array, uint8_t array_size, uint8_t window_size, float *output){
-    uint8_t new_array_size = array_size - window_size + 1;
-    float sum = 0;
-    int i;
-    for (i = 0; i < array_size; i++){
-
-        sum += array[i];
-        if (i >= window_size){
-            sum -= array[i - window_size];
-        }
-        output[i] = sum / window_size;
-    }
-}
