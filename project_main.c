@@ -586,7 +586,33 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
                 PIN_setOutputValue( led1Handle, Board_LED1, pinValue_1 );
                 gameStartTicks = clockTicks;
                 if (endBlinks >= 10) {
+                    int eatPoints = 1;
+                    int petPoints = 0;
+                    int exercicePoints = 0;
+                    if (brightnessState == BRIGHT){
+                        eatPoints = 2;
+                    }
+
                     if (totalPoints >= 1 && totalPoints < 6) {
+                        petPoints = 1;
+                        exercicePoints = 1;
+                    }
+                    else if (totalPoints >= 6 && totalPoints < 10) {
+                        eatPoints = eatPoints + 2;
+                        petPoints = 2;
+                        exercicePoints = 2;
+                    }
+                    else if (totalPoints >= 10 && totalPoints < 20) {
+                        eatPoints = eatPoints + 3;
+                        petPoints = 3;
+                        exercicePoints = 3;
+                    }
+                    sprintf(uartMsg, "ACTIVATE:%d;%d;%d",eatPoints, petPoints, exercicePoints);
+                    uartState = SEND_MSG;
+
+                }
+
+                /*if (totalPoints >= 1 && totalPoints < 6) {
                         sprintf(uartMsg, "ACTIVATE:1;1;1");
                         uartState = SEND_MSG;
                     }
@@ -598,6 +624,7 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
                         sprintf(uartMsg, "ACTIVATE:3;3;3");
                         uartState = SEND_MSG;
                     }
+                    */
                     PIN_setOutputValue( led0Handle, Board_LED0, 1 );
                     PIN_setOutputValue( led1Handle, Board_LED1, 1 );
                     blinkAccelator = 1;
@@ -609,7 +636,7 @@ Void mainTaskFxn(UArg arg0, UArg arg1) {
                     music = gameEndMusic;
                 }
             }
-        } else if (programState == MOVE_DETECTION_ALGORITHM) {
+         else if (programState == MOVE_DETECTION_ALGORITHM) {
 
             float peakTreshold = 0.15;
             float peakTime = 100;
