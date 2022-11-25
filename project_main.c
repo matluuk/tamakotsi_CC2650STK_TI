@@ -243,7 +243,6 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId)
         clearAllData();
         programState = MUSIC;
         nextState = MENU;
-        // Clock_stop(clkmasaHandle);
         music = backMusic;
         System_printf("MOVE_DETECTION stopped!\n");
         System_flush();
@@ -437,10 +436,6 @@ static void uartTaskFxn(UArg arg0, UArg arg1)
         }
         uartState = WAITING;
 
-        // Just for sanity check for exercise, you can comment this out
-        // System_printf("uartTask\n");
-        // System_flush();
-
         Task_sleep(30000 / Clock_tickPeriod);
     }
 }
@@ -522,16 +517,11 @@ Void sensorTaskFxn(UArg arg0, UArg arg1)
             if (ambientLight <= 65 && ambientLight > 0)
             {
                 brightnessState = DARK;
-                /*sprintf(msg," On pime��, valoisuus: %.2f luxia\n",ambientLight);
-                System_printf(msg);
-                System_flush();*/
             }
             else if (ambientLight > 65)
             {
                 brightnessState = BRIGHT;
-                /*sprintf(msg," On valoisaa, valoisuus: %.2f luxia\n",ambientLight);
-                System_printf(msg);
-                System_flush();*/
+
             }
 
             lastTimeTicks = clockTicks;
@@ -583,11 +573,6 @@ Void sensorTaskFxn(UArg arg0, UArg arg1)
             }
         }
 
-        // Just for sanity check for exercise, you can comment this out
-        // System_printf("sensorTask\n");
-        // System_flush();
-
-        // 20 times per second, you can modify this
         Task_sleep(50000 / Clock_tickPeriod);
     }
 }
@@ -917,12 +902,7 @@ void sendData()
     System_printf(msgg);
     for (i = 0; i < dataSize; i++)
     {
-        /*
-        index = dataIndex + i;
-        if (index >= dataSize){
-            index = index - dataSize;
-        }
-        */
+
 
         sprintf(msgg, "%05f,%05f,%05f,%05f,%05f,%05f,%05f\n",
                 dataTime[i] - dataTime[0],
