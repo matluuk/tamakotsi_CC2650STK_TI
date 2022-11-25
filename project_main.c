@@ -448,10 +448,6 @@ static void uartTaskFxn(UArg arg0, UArg arg1)
 
         }
 
-        // Just for sanity check for exercise, you can comment this out
-        // System_printf("uartTask\n");
-        // System_flush();
-
         Task_sleep(30000 / Clock_tickPeriod);
     }
 }
@@ -533,16 +529,11 @@ Void sensorTaskFxn(UArg arg0, UArg arg1)
             if (ambientLight <= 65 && ambientLight > 0)
             {
                 brightnessState = DARK;
-                /*sprintf(msg," On pime��, valoisuus: %.2f luxia\n",ambientLight);
-                System_printf(msg);
-                System_flush();*/
             }
             else if (ambientLight > 65)
             {
                 brightnessState = BRIGHT;
-                /*sprintf(msg," On valoisaa, valoisuus: %.2f luxia\n",ambientLight);
-                System_printf(msg);
-                System_flush();*/
+
             }
 
             lastTimeTicks = clockTicks;
@@ -590,11 +581,6 @@ Void sensorTaskFxn(UArg arg0, UArg arg1)
             }
         }
 
-        // Just for sanity check for exercise, you can comment this out
-        // System_printf("sensorTask\n");
-        // System_flush();
-
-        // 20 times per second, you can modify this
         Task_sleep(50000 / Clock_tickPeriod);
     }
 }
