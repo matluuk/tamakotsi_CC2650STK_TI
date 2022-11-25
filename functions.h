@@ -7,8 +7,8 @@
 
 
 
-#ifndef FUNKTIONS_H_
-#define FUNKTIONS_H_
+#ifndef FUNCTIONS_H_
+#define FUNCTIONS_H_
 
 #include <inttypes.h>
 

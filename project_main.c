@@ -1,4 +1,5 @@
 /* C Standard library */
+#include <functions.h>
 #include <stdio.h>
 #include <inttypes.h>
 
@@ -27,7 +28,6 @@
 
 /* Own libraries*/
 #include "music.h"
-#include "funktions.h"
 
 /*
  * TODOS:
@@ -70,7 +70,8 @@ enum stateMenu
 {
     MOVE,
     PLAY_GAME,
-    PLAY_MUSIC
+    PLAY_MUSIC,
+    NOT_IN_MENU
 };
 enum stateBrightness
 {
@@ -84,6 +85,7 @@ enum stateMenu menuState = MOVE;
 enum stateBrightness brightnessState = DARK;
 //
 enum state nextState;
+enum stateMenu oldMenuState;
 // Chosen Music
 int *music;
 
@@ -95,7 +97,6 @@ char msgOne[40];
 char msgTwo[40];
 int getPoint = 0;
 int totalPoints = 0;
-int brightnessValue = 0;
 
 // Data for move detection
 float ambientLight = -1001.0;
@@ -188,6 +189,12 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId)
 
     if (programState == MENU)
     {
+
+        if(menuState == NOT_IN_MENU)
+        {
+            menuState = oldMenuState;
+        }
+
         switch (menuState)
         {
         case MOVE:
@@ -196,7 +203,7 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId)
             music = chooseMusic;
             mpuStartTicks = clockTicks;
             sprintf(uartMsg, "session:start\n");
-            sprintf(msgTwo,"");
+            sprintf(msgOne,"Tamagotchi is collecting data!");
             uartState = SEND_MSG;
             break;
 
@@ -207,6 +214,7 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId)
             programState = MUSIC;
             nextState = GAME;
             System_printf("Push button0 when green led is on.\nPush button1 when red led is on.\n");
+            System_flush();
             music = chooseMusic;
             gameStartTicks = clockTicks;
             break;
@@ -216,14 +224,16 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId)
             music = hedwigsThemeMusic;
             nextState = MENU;
             break;
+
         default:
             System_printf("ERROR, invalid menuState\n");
         }
+        oldMenuState = menuState;
+        menuState = NOT_IN_MENU;
     }
     else if (programState == MUSIC && nextState != GAME)
     {
         programState = MENU;
-        // System_printf("programState: MENU\n");
     }
     else if (programState == MOVE_DETECTION || programState == MOVE_DETECTION_ALGORITHM)
     {
@@ -236,6 +246,7 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId)
         // Clock_stop(clkmasaHandle);
         music = backMusic;
         System_printf("MOVE_DETECTION stopped!\n");
+        System_flush();
     }
     else if (programState == GAME)
     {
@@ -257,10 +268,10 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId)
         {
             programState = GAME_END;
             System_printf("Wrong button!\n");
+            System_flush();
             gameStartTicks = clockTicks;
         }
     }
-    System_flush();
 }
 
 /* this funktion is called when button 1 is pressed
@@ -281,49 +292,20 @@ void button1Fxn(PIN_Handle handle, PIN_Id pinId)
         switch (menuState)
         {
         case MOVE:
-            System_printf("b0: start led-game\nb1: next state\n---\n");
-            sprintf(msgOne,"MENU: LED-game");
-            sprintf(uartMsg,"");
-            uartState = SEND_MSG;
-            // Both LEDs on
-            PIN_setOutputValue(led0Handle, Board_LED0, 1);
-            PIN_setOutputValue(led1Handle, Board_LED1, 1);
-            programState = MUSIC;
-            nextState = MENU;
-            music = gameMusic;
             menuState = PLAY_GAME;
             break;
 
         case PLAY_GAME:
-            System_printf("b0: listen music\nb1: next state\n---\n");
-            sprintf(msgOne,"MENU: Listen music");
-            sprintf(uartMsg,"");
-            uartState = SEND_MSG;
-            //only green LED on
-            PIN_setOutputValue( led0Handle, Board_LED0, 1 );
-            PIN_setOutputValue( led1Handle, Board_LED1, 0 );
-            programState = MUSIC;
-            nextState = MENU;
-            music = listenMusic;
             menuState = PLAY_MUSIC;
             break;
 
         case PLAY_MUSIC:
-            System_printf("b0: Move your tamagotchi\nb1: next state\n---\n");
-            sprintf(msgOne, "MENU: Move your tamagotchi");
-            sprintf(uartMsg,"");
-            uartState = SEND_MSG;
-            //only red LED on
-            PIN_setOutputValue( led0Handle, Board_LED0, 0 );
-            PIN_setOutputValue( led1Handle, Board_LED1, 1 );
-            programState = MUSIC;
-            nextState = MENU;
-            music = moveMusic;
             menuState = MOVE;
             break;
 
         default:
             System_printf("ERROR, invalid menuState\n");
+            System_flush();
         }
     }
     else if (programState == GAME)
@@ -338,6 +320,7 @@ void button1Fxn(PIN_Handle handle, PIN_Id pinId)
                 music = gamePointMusic;
                 sprintf(msg, "You get a point! pinValue_0 : %d\n", pinValue_1);
                 System_printf(msg);
+                System_flush();
                 getPoint = getPoint + 1;
                 totalPoints = totalPoints + 1;
             }
@@ -346,10 +329,10 @@ void button1Fxn(PIN_Handle handle, PIN_Id pinId)
         {
             programState = GAME_END;
             System_printf("Wrong button!\n");
+            System_flush();
             gameStartTicks = clockTicks;
         }
     }
-    System_flush();
 }
 
 static void uartFxn(UART_Handle uart, void *rxBuf, size_t len)
@@ -593,6 +576,8 @@ Void sensorTaskFxn(UArg arg0, UArg arg1)
                 nextState = MOVE_DETECTION_ALGORITHM;
                 music = dataReadyMusic;
                 dataIndex = 0;
+                sprintf(msgOne,"Tamacotch is analyzing data!");
+                uartState = SEND_MSG;
                 System_printf("Data ready for movement algorithm.\n");
                 System_flush();
             }
@@ -610,6 +595,7 @@ Void sensorTaskFxn(UArg arg0, UArg arg1)
 Void mainTaskFxn(UArg arg0, UArg arg1)
 {
     // Variables
+
     int eatPoints;
     int petPoints;
     int exercicePoints;
@@ -617,22 +603,26 @@ Void mainTaskFxn(UArg arg0, UArg arg1)
     char msg[30];
     int blinkAccelator = 1;
     int endBlinks = 0;
-    float peakTreshold = 0.15;
-    float peakTime = 120;
-    float errorMargin = 0.12;
-    float errorTime = 100;
-    int peaks = 0;
+
+
+    //Saved states
+    int brightnessValue = -1;
+    int menuValue = -1;
 
     //variables for movement detection algorithm
     int moveAvgWindowSize = 3;
     float avgAx = 0;
     float avgAy = 0;
     float avgAz = 0;
+    float peakTreshold = 0.15;
+    float peakTime = 120;
+    float errorMargin = 0.12;
+    float errorTime = 100;
+    int peaks = 0;
 
-    // green led is on at start
+    // red led is on at start
     System_printf("b0: Move your tamagotchi\nb1: next state\n---\n");
-    PIN_setOutputValue(led1Handle, Board_LED1, 1);
-    sprintf(msgOne,"MENU: Move your tamagotchi");
+    //PIN_setOutputValue(led1Handle, Board_LED1, 1);
 
     while (1)
     {
@@ -839,6 +829,7 @@ Void mainTaskFxn(UArg arg0, UArg arg1)
             break;
 
         case MENU:
+                //Change brightness message if brightnessState is changed
                 if (brightnessValue != brightnessState)
                 {
                     if(brightnessState == DARK)
@@ -853,6 +844,61 @@ Void mainTaskFxn(UArg arg0, UArg arg1)
                     }
                 }
                 brightnessValue = brightnessState;
+
+                //Change menu message if menuState is changed
+                if (menuValue != menuState)
+                {
+                    System_printf("menuState changed!\n");
+                    System_flush();
+                    if (menuState == NOT_IN_MENU)
+                    {
+                        menuState = oldMenuState;
+                    }
+                    switch(menuState)
+                    {
+                    case PLAY_GAME:
+                        System_printf("b0: Play LED-game\nb1: next state\n---\n");
+                        System_flush();
+                        sprintf(msgOne,"MENU: LED-game");
+                        PIN_setOutputValue(led0Handle, Board_LED0, 1);
+                        PIN_setOutputValue(led1Handle, Board_LED1, 1);
+                        programState = MUSIC;
+                        nextState = MENU;
+                        music = gameMusic;
+                        break;
+
+                    case PLAY_MUSIC:
+                        System_printf("b0: Listen music\nb1: next state\n---\n");
+                        System_flush();
+                        sprintf(msgOne,"MENU: Play music");
+                        PIN_setOutputValue(led0Handle, Board_LED0, 1);
+                        PIN_setOutputValue(led1Handle, Board_LED1, 0);
+                        programState = MUSIC;
+                        nextState = MENU;
+                        music = listenMusic;
+                        break;
+
+                    case MOVE:
+                        System_printf("b0: start move detection\nb1: next state\n---\n");
+                        System_flush();
+                        sprintf(msgOne,"MENU: Move detection");
+                        PIN_setOutputValue(led0Handle, Board_LED0, 0);
+                        PIN_setOutputValue(led1Handle, Board_LED1, 1);
+                        programState = MUSIC;
+                        nextState = MENU;
+                        music = moveMusic;
+                        break;
+
+                    case NOT_IN_MENU:
+                        break;
+
+                    default:
+                        sprintf(msgOne,"MENU: Invalid menu state!");
+                        break;
+                    }
+                    uartState = SEND_MSG;
+                }
+                menuValue = menuState;
             break;
 
         }
