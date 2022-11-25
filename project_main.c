@@ -29,14 +29,12 @@
 #include "music.h"
 #include "funktions.h"
 
-/*TODOS:
- * Liikkeentunnistus pisteytys, liikkeiden valinta
- * msg1 ja msg2 viestit katoavat
- * menun tilan ilmoitus ohjelmista palatessa
- * Beep: toimaan jos programState = MUSIC Tilamuuttuja beepille?
- * Laite menee sekaisin nopeista button 0 painalluksista
- * Valoisuus pisteytykseen
- *  */
+/*
+ * TODOS:
+ -Liikkeentunnistus pisteytys, liikkeiden valinta
+ -menun tilan ilmoitus ohjelmista palatessa
+ -BEEP: toimaan jos programState = MUSIC Tilamuuttuja beepille?
+ */
 
 /* Prototypes */
 void sendData();
@@ -90,17 +88,18 @@ enum state nextState;
 int *music;
 
 // Global Variables
-float ambientLight = -1001.0;
-float ax, ay, az, gx, gy, gz, time;
 int uartBufferSize = 80;
 char uartBuffer[80];
 char uartMsg[80];
-int getPoint = 0;
-int totalPoints = 0;
 char msgOne[40];
 char msgTwo[40];
+int getPoint = 0;
+int totalPoints = 0;
+int brightnessValue = 0;
 
 // Data for move detection
+float ambientLight = -1001.0;
+float ax, ay, az, gx, gy, gz, time;
 int dataIndex;
 int dataSize = 85;
 float dataAx[85];
@@ -196,7 +195,8 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId)
             nextState = MOVE_DETECTION;
             music = chooseMusic;
             mpuStartTicks = clockTicks;
-            sprintf(uartMsg, "session:start");
+            sprintf(uartMsg, "session:start\n");
+            sprintf(msgTwo,"");
             uartState = SEND_MSG;
             break;
 
@@ -227,6 +227,10 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId)
     }
     else if (programState == MOVE_DETECTION || programState == MOVE_DETECTION_ALGORITHM)
     {
+        sprintf(uartMsg, "STOPPED!\n");
+        uartState = SEND_MSG;
+        dataIndex = 0;
+        clearAllData();
         programState = MUSIC;
         nextState = MENU;
         // Clock_stop(clkmasaHandle);
@@ -290,35 +294,36 @@ void button1Fxn(PIN_Handle handle, PIN_Id pinId)
             menuState = PLAY_GAME;
             break;
 
-            case PLAY_GAME:
-                System_printf("b0: listen music\nb1: next state\n---\n");
-                sprintf(msgOne,"MENU: Listen music");
-                sprintf(uartMsg,"");
-                uartState = SEND_MSG;
-                //only green LED on
-                PIN_setOutputValue( led0Handle, Board_LED0, 1 );
-                PIN_setOutputValue( led1Handle, Board_LED1, 0 );
-                programState = MUSIC;
-                nextState = MENU;
-                music = listenMusic;
-                menuState = PLAY_MUSIC;
-                break;
+        case PLAY_GAME:
+            System_printf("b0: listen music\nb1: next state\n---\n");
+            sprintf(msgOne,"MENU: Listen music");
+            sprintf(uartMsg,"");
+            uartState = SEND_MSG;
+            //only green LED on
+            PIN_setOutputValue( led0Handle, Board_LED0, 1 );
+            PIN_setOutputValue( led1Handle, Board_LED1, 0 );
+            programState = MUSIC;
+            nextState = MENU;
+            music = listenMusic;
+            menuState = PLAY_MUSIC;
+            break;
 
-            case PLAY_MUSIC:
-                System_printf("b0: Move your tamagotchi\nb1: next state\n---\n");
-                sprintf(msgOne, "MENU: Move your tamagotchi");
-                sprintf(uartMsg,"");
-                uartState = SEND_MSG;
-                //only red LED on
-                PIN_setOutputValue( led0Handle, Board_LED0, 0 );
-                PIN_setOutputValue( led1Handle, Board_LED1, 1 );
-                programState = MUSIC;
-                nextState = MENU;
-                music = moveMusic;
-                menuState = MOVE;
-                break;
-            default:
-                System_printf("ERROR, invalid menuState\n");
+        case PLAY_MUSIC:
+            System_printf("b0: Move your tamagotchi\nb1: next state\n---\n");
+            sprintf(msgOne, "MENU: Move your tamagotchi");
+            sprintf(uartMsg,"");
+            uartState = SEND_MSG;
+            //only red LED on
+            PIN_setOutputValue( led0Handle, Board_LED0, 0 );
+            PIN_setOutputValue( led1Handle, Board_LED1, 1 );
+            programState = MUSIC;
+            nextState = MENU;
+            music = moveMusic;
+            menuState = MOVE;
+            break;
+
+        default:
+            System_printf("ERROR, invalid menuState\n");
         }
     }
     else if (programState == GAME)
@@ -369,6 +374,7 @@ static void uartTaskFxn(UArg arg0, UArg arg1)
 
     char msg[85];
     int i;
+    const char sep[] = ":";
 
     // UART-library settings
     UART_Handle uart;
@@ -402,7 +408,6 @@ static void uartTaskFxn(UArg arg0, UArg arg1)
             uartState = WAITING;
             // sprintf(msg, "Uartmsg: %s\n", uartBuffer);
 
-            const char sep[] = ":";
             char *token;
             token = strtok(uartBuffer, sep);
 
@@ -417,19 +422,17 @@ static void uartTaskFxn(UArg arg0, UArg arg1)
                 }
                 music = lowFeaturesMusic;
             }
-
             break;
 
         case SEND_MSG:
             if (uartMsg[0] == '\0') {
                 sprintf(msg, "id:2064,MSG1:%s,MSG2:%s\0",msgOne,msgTwo);
-                UART_write(uart, msg, strlen(msg) + 1);
-                uartState = WAITING;
             } else {
                 sprintf(msg, "id:2064,MSG1:%s,MSG2:%s,%s\0",msgOne,msgTwo,uartMsg);
-                UART_write(uart, msg, strlen(msg) + 1);
-                uartState = WAITING;
+                sprintf(uartMsg,"");
             }
+            UART_write(uart, msg, strlen(msg) + 1);
+            uartState = WAITING;
             break;
 
         case SEND_DATA:
@@ -447,6 +450,7 @@ static void uartTaskFxn(UArg arg0, UArg arg1)
                 UART_write(uart, msg, strlen(msg) + 1);
             }
             break;
+
         }
         uartState = WAITING;
 
@@ -627,7 +631,8 @@ Void mainTaskFxn(UArg arg0, UArg arg1)
 
     // green led is on at start
     System_printf("b0: Move your tamagotchi\nb1: next state\n---\n");
-    PIN_setOutputValue(led0Handle, Board_LED0, 1);
+    PIN_setOutputValue(led1Handle, Board_LED1, 1);
+    sprintf(msgOne,"MENU: Move your tamagotchi");
 
     while (1)
     {
@@ -644,7 +649,8 @@ Void mainTaskFxn(UArg arg0, UArg arg1)
                petPoints = 2;
                exercicePoints = 4;
 
-               if (brightnessState == BRIGHT){
+               if (brightnessState == BRIGHT)
+               {
                    eatPoints = 3;
                    petPoints =3;
                    exercicePoints = 5;
@@ -672,7 +678,7 @@ Void mainTaskFxn(UArg arg0, UArg arg1)
 
                 if (blinkAccelator < 1800)
                 {
-                    blinkAccelator = blinkAccelator + 150;
+                    blinkAccelator = blinkAccelator + 130;
                 }
                 getPoint = 0;
                 gameStartTicks = clockTicks;
@@ -682,7 +688,7 @@ Void mainTaskFxn(UArg arg0, UArg arg1)
             break;
 
         case GAME_END:
-            // Both LEDs blinks 5 times.
+            // Both LEDs blinks 5 times and go back to menu
             if ((clockTicks - gameStartTicks) * Clock_tickPeriod / 1000 > 50)
             {
                 if (endBlinks == 0)
@@ -704,26 +710,33 @@ Void mainTaskFxn(UArg arg0, UArg arg1)
                     eatPoints = 1;
                     petPoints = 0;
                     exercicePoints = 0;
-                    if (brightnessState == BRIGHT){
-                        eatPoints = 2;
-                    }
-                    if (totalPoints >= 1 && totalPoints < 6) {
-                        petPoints = 1;
-                        exercicePoints = 1;
-                    }
-                    else if (totalPoints >= 6 && totalPoints < 10) {
-                        eatPoints = eatPoints + 2;
-                        petPoints = 2;
-                        exercicePoints = 2;
-                    }
-                    else if (totalPoints >= 10 && totalPoints < 20) {
-                        eatPoints = eatPoints + 3;
-                        petPoints = 3;
-                        exercicePoints = 3;
-                    }
-                    sprintf(uartMsg, "ACTIVATE:%d;%d;%d",eatPoints, petPoints, exercicePoints);
-                    uartState = SEND_MSG;
 
+                    if (totalPoints >= 3)
+                    {
+                        if (brightnessState == BRIGHT)
+                        {
+                            eatPoints = 2;
+                        }
+                        if (totalPoints < 6)
+                        {
+                            petPoints = 1;
+                            exercicePoints = 1;
+                        }
+                        else if (totalPoints >= 6 && totalPoints < 12)
+                        {
+                            eatPoints = eatPoints + 2;
+                            petPoints = 2;
+                            exercicePoints = 2;
+                        }
+                        else if (totalPoints >= 12)
+                        {
+                            eatPoints = eatPoints + 3;
+                            petPoints = 3;
+                            exercicePoints = 3;
+                        }
+                        sprintf(uartMsg, "ACTIVATE:%d;%d;%d",eatPoints, petPoints, exercicePoints);
+                        uartState = SEND_MSG;
+                    }
                     PIN_setOutputValue( led0Handle, Board_LED0, 1 );
                     PIN_setOutputValue( led1Handle, Board_LED1, 1 );
                     sprintf(msgTwo,"");
@@ -807,14 +820,11 @@ Void mainTaskFxn(UArg arg0, UArg arg1)
                 petPoints = 0;
                 exercicePoints = 0;
             }
-            //sprintf(msgTwo, "You accelerated Tamacotchi %d times in x+ direction.", peaks);
+            sprintf(msgTwo, "You accelerated Tamacotchi %d times in x direction.", peaks);
             sprintf(uartMsg, "session:end,ACTIVATE:%d;%d;%d",eatPoints, petPoints, exercicePoints);
             uartState = SEND_MSG;
 
             clearAllData();
-            // send message
-            sprintf(uartMsg, "session:end");
-            uartState = SEND_MSG;
             programState = MUSIC;
             nextState = MENU;
             music = menuMusic;
@@ -827,6 +837,24 @@ Void mainTaskFxn(UArg arg0, UArg arg1)
             sendData();
             System_printf("data sent.");
             break;
+
+        case MENU:
+                if (brightnessValue != brightnessState)
+                {
+                    if(brightnessState == DARK)
+                    {
+                        sprintf(msgTwo,"It is too dark in there");
+                        uartState = SEND_MSG;
+                    }
+                    else
+                    {
+                        sprintf(msgTwo,"Nice! It's so bright in there");
+                        uartState = SEND_MSG;
+                    }
+                }
+                brightnessValue = brightnessState;
+            break;
+
         }
         System_flush();
         Task_sleep(50000 / Clock_tickPeriod);
