@@ -34,9 +34,11 @@
  -Liikkeentunnistus pisteytys, liikkeiden valinta
  -menun tilan ilmoitus ohjelmista palatessa
  -BEEP: toimaan jos programState = MUSIC Tilamuuttuja beepille?
+ - Moving average: dont work with z axis -1 value
  */
 
 /* Prototypes */
+void writeUartMsg(UART_Handle uart);
 void sendData();
 void playMusic(PIN_Handle buzzerPin, int *note, int tempo);
 void clearAllData();
@@ -56,6 +58,7 @@ enum state
     SEND_DATATODEBUG,
     MOVE_DETECTION,
     MOVE_DETECTION_ALGORITHM,
+    MOVE_DETECTION_WAITING,
     GAME,
     GAME_END
 };
@@ -92,11 +95,12 @@ int *music;
 // Global Variables
 int uartBufferSize = 80;
 char uartBuffer[80];
-char uartMsg[80];
-char msgOne[40];
-char msgTwo[40];
+char uartMsg[40];
+char msgOne[50];
+char msgTwo[50];
 int getPoint = 0;
 int totalPoints = 0;
+int dataSentUart = 0;
 
 // Data for move detection
 float ambientLight = -1001.0;
@@ -201,8 +205,9 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId)
             programState = MUSIC;
             nextState = MOVE_DETECTION;
             music = chooseMusic;
+            System_printf("move detection\n");
+            System_flush();
             mpuStartTicks = clockTicks;
-            sprintf(uartMsg, "session:start\n");
             sprintf(msgOne,"Tamagotchi is collecting data!");
             uartState = SEND_MSG;
             break;
@@ -235,15 +240,13 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId)
     {
         programState = MENU;
     }
-    else if (programState == MOVE_DETECTION || programState == MOVE_DETECTION_ALGORITHM)
+    else if (programState == MOVE_DETECTION || programState == MOVE_DETECTION_ALGORITHM || programState == MOVE_DETECTION_WAITING)
     {
         sprintf(uartMsg, "STOPPED!\n");
         uartState = SEND_MSG;
-        dataIndex = 0;
         clearAllData();
         programState = MUSIC;
         nextState = MENU;
-        // Clock_stop(clkmasaHandle);
         music = backMusic;
         System_printf("MOVE_DETECTION stopped!\n");
         System_flush();
@@ -408,19 +411,20 @@ static void uartTaskFxn(UArg arg0, UArg arg1)
             break;
 
         case SEND_MSG:
-            if (uartMsg[0] == '\0') {
-                sprintf(msg, "id:2064,MSG1:%s,MSG2:%s\0",msgOne,msgTwo);
-            } else {
-                sprintf(msg, "id:2064,MSG1:%s,MSG2:%s,%s\0",msgOne,msgTwo,uartMsg);
-                sprintf(uartMsg,"");
-            }
-            UART_write(uart, msg, strlen(msg) + 1);
+            writeUartMsg(uart);
+            System_printf("uartTask,SEND_MSG: msg sent\n");
+            System_flush();
             uartState = WAITING;
             break;
 
         case SEND_DATA:
+            writeUartMsg(uart);
+            System_printf("uartTask,SEND_DATA: msg sent\n");
+            System_flush();
             // sends data currently not in use
-            for (i = 0; i < dataSize; i++)
+            sprintf(msg, "id:2064,session:start");
+            UART_write(uart, msg, strlen(msg) + 1);
+            for (i = 0; i < dataIndex; i++)
             {
                 sprintf(msg, "id:2064,time:%.3f,ax:%.3f,ay:%.3f,az:%.3f,gx:%.3f,gy:%.3f,gz:%.3f",
                         (dataTime[i] - dataTime[0]),
@@ -432,10 +436,17 @@ static void uartTaskFxn(UArg arg0, UArg arg1)
                         dataGz[i]);
                 UART_write(uart, msg, strlen(msg) + 1);
             }
+            sprintf(msg, "id:2064,session:end");
+            UART_write(uart, msg, strlen(msg) + 1);
+
+            dataSentUart = 1;
+            uartState = WAITING;
+            System_printf("Data sent to uart!\n");
+            System_flush();
+
             break;
 
         }
-        uartState = WAITING;
 
         // Just for sanity check for exercise, you can comment this out
         // System_printf("uartTask\n");
@@ -557,9 +568,6 @@ Void sensorTaskFxn(UArg arg0, UArg arg1)
                 // MPU close i2c
                 I2C_close(i2cMPU);
 
-                sprintf(uartMsg, "time:%.2f,ax:%.2f,ay:%.2f,az:%.2f,gx:%.2f,gy:%.2f,gz:%.2f", (time - (mpuStartTicks * Clock_tickPeriod / 1000)), ax, ay, az, gx, gy, gz);
-                uartState = SEND_MSG;
-
                 // saving data to lists
                 dataTime[dataIndex] = time;
                 dataAx[dataIndex] = ax;
@@ -575,8 +583,7 @@ Void sensorTaskFxn(UArg arg0, UArg arg1)
                 programState = MUSIC;
                 nextState = MOVE_DETECTION_ALGORITHM;
                 music = dataReadyMusic;
-                dataIndex = 0;
-                sprintf(msgOne,"Tamacotch is analyzing data!");
+                sprintf(msgOne,"Tamagotchi is analyzing data!");
                 uartState = SEND_MSG;
                 System_printf("Data ready for movement algorithm.\n");
                 System_flush();
@@ -742,16 +749,20 @@ Void mainTaskFxn(UArg arg0, UArg arg1)
             break;
 
         case MOVE_DETECTION_ALGORITHM:
-            /*
+
+            programState = MUSIC;
+            nextState = MOVE_DETECTION_WAITING;
+            music = menuMusic;
+
             //Calculate moving averages
             movavg(dataAx, dataSize, moveAvgWindowSize);
             movavg(dataAy, dataSize, moveAvgWindowSize);
             movavg(dataAz, dataSize, moveAvgWindowSize);
-            */
 
-            avgAx = average(dataAx, dataSize);
-            avgAy = average(dataAy, dataSize);
-            avgAz = average(dataAz, dataSize);
+
+            avgAx = average(dataAx, dataIndex);
+            avgAy = average(dataAy, dataIndex);
+            avgAz = average(dataAz, dataIndex);
 
             sprintf(msg, "avgAx: %.2f\n", avgAx);
             System_printf(msg);
@@ -765,59 +776,77 @@ Void mainTaskFxn(UArg arg0, UArg arg1)
             //Testing code
             // display peaks + side
             System_printf("peakCounts without error margin + side:\n");
-            peaks = peakCount(dataTime, dataAx, dataSize, peakTreshold, avgAx, 1, peakTime);
+            peaks = peakCount(dataTime, dataAx, dataIndex, peakTreshold, avgAx, 1, peakTime);
             sprintf(msg, "Ax: = %d\n", peaks);
             System_printf(msg);
-            peaks = peakCount(dataTime, dataAy, dataSize, peakTreshold, avgAy, 1, peakTime);
+            peaks = peakCount(dataTime, dataAy, dataIndex, peakTreshold, avgAy, 1, peakTime);
             sprintf(msg, "Ay: = %d\n", peaks);
             System_printf(msg);
-            peaks = peakCount(dataTime, dataAz, dataSize, peakTreshold, avgAz, 1, peakTime);
+            peaks = peakCount(dataTime, dataAz, dataIndex, peakTreshold, avgAz, 1, peakTime);
             sprintf(msg, "Az: = %d\n", peaks);
             System_printf(msg);
             System_flush();
 
             // display peaks - side
             System_printf("peakCounts with error margin + side:\n");
-            peaks = peakCountMargin(dataTime, dataAx, dataAy, dataAz, dataSize, peakTreshold, peakTime, errorMargin, errorTime);
+            peaks = peakCountMargin(dataTime, dataAx, dataAy, dataAz, dataIndex, peakTreshold, peakTime, errorMargin, errorTime);
             sprintf(msg, "Ax: = %d\n", peaks);
             System_printf(msg);
-            peaks = peakCountMargin(dataTime, dataAy, dataAx, dataAz, dataSize, peakTreshold, peakTime, errorMargin, errorTime);
+            peaks = peakCountMargin(dataTime, dataAy, dataAx, dataAz, dataIndex, peakTreshold, peakTime, errorMargin, errorTime);
             sprintf(msg, "Ay: = %d\n", peaks);
             System_printf(msg);
-            peaks = peakCountMargin(dataTime, dataAz, dataAx, dataAy, dataSize, peakTreshold, peakTime, errorMargin, errorTime);
+            peaks = peakCountMargin(dataTime, dataAz, dataAx, dataAy, dataIndex, peakTreshold, peakTime, errorMargin, errorTime);
             sprintf(msg, "Az: = %d\n", peaks);
             System_printf(msg);
             System_flush();
 
 
             //movement in x direction
-            peaks = peakCountMargin(dataTime, dataAx, dataAy, dataAz, dataSize, peakTreshold, peakTime, errorMargin, errorTime);
+            peaks = peakCountMargin(dataTime, dataAx, dataAy, dataAz, dataIndex, peakTreshold, peakTime, errorMargin, errorTime);
 
             sprintf(msg, "Ax: = %d\n", peaks);
             System_printf(msg);
             System_flush();
 
-            if (peaks >= 3){
-                eatPoints = 3;
-                petPoints = 3;
-                exercicePoints = 5;
-            }else if (peaks >= 1){
-                eatPoints = 2;
-                petPoints = 2;
-                exercicePoints = 4;
-            } else {
-                eatPoints = 0;
-                petPoints = 0;
-                exercicePoints = 0;
-            }
-            sprintf(msgTwo, "You accelerated Tamacotchi %d times in x direction.", peaks);
-            sprintf(uartMsg, "session:end,ACTIVATE:%d;%d;%d",eatPoints, petPoints, exercicePoints);
-            uartState = SEND_MSG;
+            eatPoints = 0;
+            petPoints = 0;
+            exercicePoints = 0;
 
-            clearAllData();
-            programState = MUSIC;
-            nextState = MENU;
-            music = menuMusic;
+            if (peaks > 0)
+            {
+
+                if (peaks >= 3){
+                    eatPoints = 3;
+                    petPoints = 3;
+                    exercicePoints = 5;
+                }else if (peaks >= 1){
+                    eatPoints = 2;
+                    petPoints = 2;
+                    exercicePoints = 4;
+                }
+                sprintf(msgTwo, "Tamagotchi %d times in x direction", peaks);
+            }
+            else if(peaks == -1)
+            {
+                sprintf(msgTwo, "Tamagotchi moved too much in y direction");
+            }
+            else
+            {
+                sprintf(msgTwo, "Tamagotchi moved too much in z direction");
+            }
+
+            sprintf(uartMsg, "ACTIVATE:%d;%d;%d",eatPoints, petPoints, exercicePoints);
+            uartState = SEND_DATA;
+            break;
+
+        case MOVE_DETECTION_WAITING:
+            if (dataSentUart){
+                programState = MENU;
+                dataSentUart = 0;
+                System_printf("mainTask,MOVE_DETECTION_WAITING: back to menu!\n");
+                System_flush();
+                clearAllData();
+            }
             break;
 
         case SEND_DATATODEBUG:
@@ -825,7 +854,7 @@ Void mainTaskFxn(UArg arg0, UArg arg1)
             nextState = MENU;
             music = backMusic;
             sendData();
-            System_printf("data sent.");
+            System_printf("data sent to debug.\n");
             break;
 
         case MENU:
@@ -845,7 +874,6 @@ Void mainTaskFxn(UArg arg0, UArg arg1)
                 }
                 brightnessValue = brightnessState;
 
-                //Change menu message if menuState is changed
                 if (menuValue != menuState)
                 {
                     System_printf("menuState changed!\n");
@@ -908,6 +936,18 @@ Void mainTaskFxn(UArg arg0, UArg arg1)
 }
 
 // Own functions
+void writeUartMsg(UART_Handle uart)
+{
+    char msg[170];
+    if (uartMsg[0] == '\0') {
+        sprintf(msg, "id:2064,MSG1:%s,MSG2:%s\0",msgOne,msgTwo);
+    } else {
+        sprintf(msg, "id:2064,MSG1:%s,MSG2:%s,%s\0",msgOne,msgTwo,uartMsg);
+        sprintf(uartMsg,"");
+    }
+    UART_write(uart, msg, strlen(msg) + 1);
+}
+
 void sendData()
 {
     // sends data
@@ -915,15 +955,8 @@ void sendData()
     int i;
     sprintf(msgg, "[time, ax, ay, az, gx, gy, gz]\n");
     System_printf(msgg);
-    for (i = 0; i < dataSize; i++)
+    for (i = 0; i < dataIndex; i++)
     {
-        /*
-        index = dataIndex + i;
-        if (index >= dataSize){
-            index = index - dataSize;
-        }
-        */
-
         sprintf(msgg, "%05f,%05f,%05f,%05f,%05f,%05f,%05f\n",
                 dataTime[i] - dataTime[0],
                 dataAx[i],
@@ -935,6 +968,7 @@ void sendData()
         System_printf(msgg);
         System_flush();
     }
+
     clearAllData();
 }
 
@@ -997,6 +1031,7 @@ void clearAllData()
     clearData(dataGy, dataSize);
     clearData(dataGz, dataSize);
     clearData(dataTime, dataSize);
+    dataIndex = 0;
     System_printf("All data cleared!\n");
     System_flush();
 }

@@ -23,7 +23,10 @@ float average(float *data, int dataSize){
     }
     return (sum / dataSize);
 }
-
+/*
+ * Calculates moving average to list
+ * Currently don't work well if starting value is not near 0
+*/
 void movavg(float *array, uint8_t array_size, uint8_t window_size){
     float sum = 0;
     int i;
