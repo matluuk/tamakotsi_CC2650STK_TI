@@ -31,10 +31,8 @@
 
 /*TODOS:
  * Liikkeentunnistus pisteytys, liikkeiden valinta
- * liikkeentunnistus moveavg
  * msg1 ja msg2 viestit katoavat
  * menun tilan ilmoitus ohjelmista palatessa
- * led game: nopeuttaminen
  * Beep: toimaan jos programState = MUSIC Tilamuuttuja beepille?
  * Laite menee sekaisin nopeista button 0 painalluksista
  * Valoisuus pisteytykseen
@@ -866,7 +864,7 @@ void sendData()
     clearAllData();
 }
 
-void playMusic(PIN_Handle buzzerPin, int *note, int tempo)
+void playMusic(PIN_Handle buzzerPin, int *music, int tempo)
 {
 
     // this calculates the duration of a whole note in ms (60s/tempo)*4 beats
@@ -874,13 +872,10 @@ void playMusic(PIN_Handle buzzerPin, int *note, int tempo)
 
     int divider = 0, noteDuration = 0;
 
-    // char msg[10];
-
-    // code modifief from: https://github.com/robsoncouto/arduino-songs
+    // code modified from: https://github.com/robsoncouto/arduino-songs
     // iterate over the notes of the melody.
-    // Remember, the array is twice the number of notes (notes + durations)
-
-    for (note; *note != -1; note = note + 2)
+    int *note;
+    for (note = music;*note != -1; note = note + 2)
     {
         if (programState == MUSIC)
         {
@@ -901,19 +896,13 @@ void playMusic(PIN_Handle buzzerPin, int *note, int tempo)
             // we only play the note for 90% of the duration, leaving 10% as a pause
             buzzerOpen(buzzerPin);
             buzzerSetFrequency(*note);
-            Task_sleep(noteDuration * 0.9 / Clock_tickPeriod);
-
-            /*for testing purposes
-            sprintf(msg, "taajuus: %d\n", *note);
-            System_printf(msg);
-            System_flush();
-            */
+            Task_sleep(noteDuration * 0.9 / Clock_tickPeriod); //Is not good idea to use in the task this way
 
             // stop buzzer before the next note.
             buzzerClose();
 
             // Wait for the specified duration before playing the next note.
-            Task_sleep(noteDuration * 0.1 / Clock_tickPeriod);
+            Task_sleep(noteDuration * 0.1 / Clock_tickPeriod); //Is not good idea to use in the task this way
         }
         else
         {
