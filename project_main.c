@@ -102,16 +102,16 @@ enum stateMenu oldMenuState;
 int *music;
 
 /* Global variables */
-// uart and communication
+//uart and communication
 int uartBufferSize = 80;
 char uartBuffer[80];
 char uartMsg[40];
 char msgOne[50];
 char msgTwo[50];
 char id[] = "id:2064,";
-int dataSentUart = 0; // Saves if data is sent to uart
+int dataSentUart = 0; //Saves if data is sent to uart
 
-// led game
+//led game
 int getPoint = 0;
 int totalPoints = 0;
 
@@ -207,7 +207,7 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId)
 
         switch (menuState)
         {
-        // Select function depending of menu state
+        //Select function depending of menu state
         case MOVE:
             programState = MUSIC;
             nextState = MOVE_DETECTION;
@@ -241,7 +241,7 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId)
             System_printf("ERROR, invalid menuState\n");
             System_flush();
         }
-        // Saves menustate
+        //Saves menustate
         oldMenuState = menuState;
         menuState = NOT_IN_MENU;
     }
@@ -527,10 +527,10 @@ Void sensorTaskFxn(UArg arg0, UArg arg1)
                 System_abort("Error Initializing I2C\n");
             }
 
-            // Get opt3001 data
+            //Get opt3001 data
             ambientLight = opt3001_get_data(&i2c);
 
-            // Check value
+            //Check value
             if (ambientLight <= 65 && ambientLight > 0)
             {
                 brightnessState = DARK;
@@ -540,7 +540,7 @@ Void sensorTaskFxn(UArg arg0, UArg arg1)
                 brightnessState = BRIGHT;
             }
 
-            // saves current ticks
+            //saves current ticks
             lastTimeTicks = clockTicks;
 
             // close i2c
@@ -576,13 +576,13 @@ Void sensorTaskFxn(UArg arg0, UArg arg1)
             }
             else
             {
-                // Ends data gathering
-                // Plays music
+                //Ends data gathering
+                //Plays music
                 programState = MUSIC;
                 nextState = MOVE_DETECTION_ALGORITHM;
                 music = dataReadyMusic;
-                // Message to uart
-                sprintf(msgOne, "Tamagotchi is analyzing data!");
+                //Message to uart
+                sprintf(msgOne,"Tamagotchi is analyzing data!");
                 uartState = SEND_MSG;
 
                 System_printf("Data ready for movement algorithm.\n");
@@ -596,7 +596,7 @@ Void sensorTaskFxn(UArg arg0, UArg arg1)
 
 Void mainTaskFxn(UArg arg0, UArg arg1)
 {
-    // Constants for movement algorithm
+    //Constants for movement algorithm
     const int moveAvgWindowSize = 3;
     const float peakTreshold = 0.15;
     const float peakTime = 120;

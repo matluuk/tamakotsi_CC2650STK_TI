@@ -16,7 +16,7 @@
 /// @param dataSize time and acceleration data size. Both sould be same
 /// @param treshold Treshold for data value to be counted as peak
 /// @param tresholdOffset Value from treshold is calculated
-/// @param direction if < 0 function calculates negative peaks.
+/// @param direction if < 0 function calculates negative peaks. 
 ///     if > 0 funktion calculates positive peaks
 ///     if = 0 fuction calculates both peaks
 /// @param peakTime Time what data value must be over treshold
