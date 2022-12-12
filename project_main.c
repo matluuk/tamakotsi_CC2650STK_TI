@@ -34,7 +34,6 @@
  -Liikkeentunnistus pisteytys, liikkeiden valinta
  -menun tilan ilmoitus ohjelmista palatessa
  -BEEP: toimaan jos programState = MUSIC Tilamuuttuja beepille?
- -Laite menee sekaisin nopeista button 0 painalluksista
  */
 
 /* Prototypes */
@@ -196,7 +195,7 @@ void button0Fxn(PIN_Handle handle, PIN_Id pinId)
             nextState = MOVE_DETECTION;
             music = chooseMusic;
             mpuStartTicks = clockTicks;
-            sprintf(uartMsg, "session:start\n");
+            sprintf(uartMsg, "session:start");
             sprintf(msgTwo,"");
             uartState = SEND_MSG;
             break;
